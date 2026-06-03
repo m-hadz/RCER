@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Map, { NavigationControl, Source, Layer, MapLayerMouseEvent, MapRef } from "react-map-gl/maplibre";
+import Map, { NavigationControl, Source, Layer, MapLayerMouseEvent, MapRef, Popup } from "react-map-gl/maplibre";
 import * as turf from "@turf/turf";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -9,7 +9,7 @@ import { useDuckDb } from "../hooks/useDuckDb";
 
 const DEFAULT_MAP_STYLE = `https://api.maptiler.com/maps/019e8e0d-6eac-7277-94ee-b39ae7dc292d/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
 const OUTDOOR_MAP_STYLE = `https://api.maptiler.com/maps/outdoor-v4/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
-const CHILE_GEOJSON_URL = "https://raw.githubusercontent.com/johan/world.geo.json/master/countries/CHL.geo.json";
+const CHILE_GEOJSON_URL = "/chile_highres.geojson";
 
 const QUERY_MARCADORES = `
   SELECT id_saviia, id_centro_estacion, title AS nombre, latitude AS latitud, longitude AS longitud
@@ -35,6 +35,7 @@ export default function ChileMap() {
   const [chileOutline, setChileOutline] = React.useState<any>(null);
   const [filas, setFilas] = React.useState<any[]>([]);
   const [cursor, setCursor] = React.useState<string>("grab");
+  const [hoverInfo, setHoverInfo] = React.useState<{longitude: number, latitude: number, nombre: string} | null>(null);
   const [currentMapStyle, setCurrentMapStyle] = React.useState<string>(DEFAULT_MAP_STYLE);
   
   // NIVEL 1: Dataset
@@ -71,12 +72,17 @@ export default function ChileMap() {
   }, [duckDb]);
 
   React.useEffect(() => {
+    // Load the border outline
     fetch(CHILE_GEOJSON_URL)
       .then((res) => res.json())
-      .then((data) => {
-        setChileOutline(data);
-        setMaskData(turf.mask(data));
-      });
+      .then(setChileOutline)
+      .catch(console.error);
+
+    // Load the PRE-CALCULATED mask directly to avoid freezing the browser with turf.mask()
+    fetch("/chile_mask.geojson")
+      .then((res) => res.json())
+      .then(setMaskData)
+      .catch(console.error);
   }, []);
 
   const geojsonPuntos = React.useMemo(() => {
@@ -212,9 +218,53 @@ export default function ChileMap() {
 
       {/* MAPA BASE */}
       <div className="absolute inset-0 w-full h-full z-0">
-        <Map ref={mapRef} initialViewState={{ longitude: -71.0, latitude: -39.0, zoom: 4, bearing: 90, pitch: 0 }} style={{ width: "100%", height: "100%" }} mapStyle={currentMapStyle} minZoom={1} maxZoom={10} interactiveLayerIds={["marcadores-layer"]} onClick={onMapClick} cursor={cursor} onMouseEnter={(e) => { if (e.features?.length) setCursor("pointer") }} onMouseLeave={() => setCursor("grab")}>
+        <Map 
+          ref={mapRef} 
+          initialViewState={{ longitude: -71.0, latitude: -39.0, zoom: 4, bearing: 90, pitch: 0 }} 
+          style={{ width: "100%", height: "100%" }} 
+          mapStyle={currentMapStyle} 
+          minZoom={1} 
+          maxZoom={10} 
+          interactiveLayerIds={["marcadores-layer"]} 
+          onClick={onMapClick} 
+          cursor={cursor} 
+          onMouseMove={(e) => {
+            const feature = e.features?.[0];
+            if (feature) {
+              setCursor("pointer");
+              const coords = (feature.geometry as any).coordinates;
+              setHoverInfo({
+                longitude: coords[0],
+                latitude: coords[1],
+                nombre: feature.properties?.nombre
+              });
+            } else {
+              setCursor("grab");
+              setHoverInfo(null);
+            }
+          }}
+          onMouseLeave={() => {
+            setCursor("grab");
+            setHoverInfo(null);
+          }}
+        >
+          {hoverInfo && (
+            <Popup
+              longitude={hoverInfo.longitude}
+              latitude={hoverInfo.latitude}
+              closeButton={false}
+              closeOnClick={false}
+              anchor="bottom"
+              offset={10}
+              className="custom-tooltip z-50"
+            >
+              <div className="px-2.5 py-1.5 text-sm font-semibold text-gray-800 bg-gray-100 border border-gray-400 rounded-md shadow-md">
+                {hoverInfo.nombre}
+              </div>
+            </Popup>
+          )}
           <NavigationControl position="bottom-left" />
-          {maskData && <Source id="world-mask" type="geojson" data={maskData}><Layer id="mask-layer" type="fill" paint={{ "fill-color": "#ffffff", "fill-opacity": 1 }} /></Source>}
+          {maskData && <Source id="world-mask" type="geojson" data={maskData}><Layer id="mask-layer" type="fill" paint={{ "fill-color": detalleSeleccionado ? "#a8c5ed" : "#ffffff", "fill-color-transition": { duration: 1000 }, "fill-opacity": 1 }} /></Source>}
           {chileOutline && <Source id="chile-border" type="geojson" data={chileOutline}><Layer id="border-layer" type="line" paint={{ "line-color": "#000000", "line-width": 1, "line-opacity": 0.15 }} /></Source>}
           {geojsonPuntos && <Source id="duckdb-marcadores" type="geojson" data={geojsonPuntos as any}><Layer id="marcadores-layer" type="circle" paint={{ "circle-radius": 7, "circle-color": "#ea580c", "circle-stroke-width": 1.5, "circle-stroke-color": "#ffffff" }} /></Source>}
         </Map>

@@ -19,3 +19,14 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Custom Tooltip Overrides for Maplibre */
+.custom-tooltip .maplibregl-popup-content {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border: none !important;
+}
+.custom-tooltip .maplibregl-popup-tip {
+  display: none !important;
+}
