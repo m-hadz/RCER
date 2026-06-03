@@ -7,9 +7,9 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 import { useDuckDb } from "../hooks/useDuckDb"; 
 
-const DEFAULT_MAP_STYLE = `https://api.maptiler.com/maps/019e8e0d-6eac-7277-94ee-b39ae7dc292d/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
-const OUTDOOR_MAP_STYLE = `https://api.maptiler.com/maps/outdoor-v4/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
-const CHILE_GEOJSON_URL = "/chile_highres.geojson";
+const DEFAULT_MAP_STYLE_URL = `https://api.maptiler.com/maps/019e8e0d-6eac-7277-94ee-b39ae7dc292d/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
+const OUTDOOR_MAP_STYLE_URL = `https://api.maptiler.com/maps/outdoor-v4/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
+
 
 const QUERY_MARCADORES = `
   SELECT id_saviia, id_centro_estacion, title AS nombre, latitude AS latitud, longitude AS longitud
@@ -32,11 +32,23 @@ export default function ChileMap() {
   const mapRef = React.useRef<MapRef>(null);
 
   const [maskData, setMaskData] = React.useState<any>(null);
-  const [chileOutline, setChileOutline] = React.useState<any>(null);
+
   const [filas, setFilas] = React.useState<any[]>([]);
   const [cursor, setCursor] = React.useState<string>("grab");
   const [hoverInfo, setHoverInfo] = React.useState<{longitude: number, latitude: number, nombre: string} | null>(null);
-  const [currentMapStyle, setCurrentMapStyle] = React.useState<string>(DEFAULT_MAP_STYLE);
+  const [defaultStyle, setDefaultStyle] = React.useState<any>(DEFAULT_MAP_STYLE_URL);
+  const [outdoorStyle, setOutdoorStyle] = React.useState<any>(OUTDOOR_MAP_STYLE_URL);
+  const [currentMapStyle, setCurrentMapStyle] = React.useState<any>(DEFAULT_MAP_STYLE_URL);
+
+  React.useEffect(() => {
+    // Pre-fetch styles to avoid blank canvas flashing when switching
+    fetch(DEFAULT_MAP_STYLE_URL).then(r => r.json()).then(json => {
+      setDefaultStyle(json);
+      setCurrentMapStyle((prev: any) => typeof prev === 'string' ? json : prev);
+    }).catch(e => console.error(e));
+    
+    fetch(OUTDOOR_MAP_STYLE_URL).then(r => r.json()).then(setOutdoorStyle).catch(e => console.error(e));
+  }, []);
   
   // NIVEL 1: Dataset
   const [detalleSeleccionado, setDetalleSeleccionado] = React.useState<any | null>(null);
@@ -72,11 +84,6 @@ export default function ChileMap() {
   }, [duckDb]);
 
   React.useEffect(() => {
-    // Load the border outline
-    fetch(CHILE_GEOJSON_URL)
-      .then((res) => res.json())
-      .then(setChileOutline)
-      .catch(console.error);
 
     // Load the PRE-CALCULATED mask directly to avoid freezing the browser with turf.mask()
     fetch("/chile_mask.geojson")
@@ -115,7 +122,7 @@ export default function ChileMap() {
 
     const paddingDerecho = window.innerWidth * 0.66; 
     const coords = (feature.geometry as any).coordinates;
-    setCurrentMapStyle(OUTDOOR_MAP_STYLE);
+    setCurrentMapStyle(outdoorStyle);
     mapRef.current?.flyTo({ center: [coords[0], coords[1]], zoom: 6.5, bearing: 0, duration: 1000, padding: { right: paddingDerecho, left: 0, top: 0, bottom: 0 } });
 
     try {
@@ -201,7 +208,7 @@ export default function ChileMap() {
     setActivosLakehouse(null);
     setIdLakehouseActual(null);
     setTablaActiva(null);
-    setCurrentMapStyle(DEFAULT_MAP_STYLE);
+    setCurrentMapStyle(defaultStyle);
     mapRef.current?.flyTo({ center: [-71.0, -39.0], zoom: 4, bearing: 90, duration: 1000, padding: { right: 0, left: 0, top: 0, bottom: 0 } });
   };
 
@@ -265,7 +272,7 @@ export default function ChileMap() {
           )}
           <NavigationControl position="bottom-left" />
           {maskData && <Source id="world-mask" type="geojson" data={maskData}><Layer id="mask-layer" type="fill" paint={{ "fill-color": detalleSeleccionado ? "#a8c5ed" : "#ffffff", "fill-color-transition": { duration: 1000 }, "fill-opacity": 1 }} /></Source>}
-          {chileOutline && <Source id="chile-border" type="geojson" data={chileOutline}><Layer id="border-layer" type="line" paint={{ "line-color": "#000000", "line-width": 1, "line-opacity": 0.15 }} /></Source>}
+
           {geojsonPuntos && <Source id="duckdb-marcadores" type="geojson" data={geojsonPuntos as any}><Layer id="marcadores-layer" type="circle" paint={{ "circle-radius": 7, "circle-color": "#ea580c", "circle-stroke-width": 1.5, "circle-stroke-color": "#ffffff" }} /></Source>}
         </Map>
       </div>
