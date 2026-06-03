@@ -7,7 +7,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 import { useDuckDb } from "../hooks/useDuckDb"; 
 
-const MAP_STYLE = `https://api.maptiler.com/maps/019e8e0d-6eac-7277-94ee-b39ae7dc292d/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
+const DEFAULT_MAP_STYLE = `https://api.maptiler.com/maps/019e8e0d-6eac-7277-94ee-b39ae7dc292d/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
+const OUTDOOR_MAP_STYLE = `https://api.maptiler.com/maps/outdoor-v4/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
 const CHILE_GEOJSON_URL = "https://raw.githubusercontent.com/johan/world.geo.json/master/countries/CHL.geo.json";
 
 const QUERY_MARCADORES = `
@@ -34,6 +35,7 @@ export default function ChileMap() {
   const [chileOutline, setChileOutline] = React.useState<any>(null);
   const [filas, setFilas] = React.useState<any[]>([]);
   const [cursor, setCursor] = React.useState<string>("grab");
+  const [currentMapStyle, setCurrentMapStyle] = React.useState<string>(DEFAULT_MAP_STYLE);
   
   // NIVEL 1: Dataset
   const [detalleSeleccionado, setDetalleSeleccionado] = React.useState<any | null>(null);
@@ -107,7 +109,8 @@ export default function ChileMap() {
 
     const paddingDerecho = window.innerWidth * 0.66; 
     const coords = (feature.geometry as any).coordinates;
-    mapRef.current?.flyTo({ center: [coords[0], coords[1]], zoom: 6.5, duration: 1000, padding: { right: paddingDerecho, left: 0, top: 0, bottom: 0 } });
+    setCurrentMapStyle(OUTDOOR_MAP_STYLE);
+    mapRef.current?.flyTo({ center: [coords[0], coords[1]], zoom: 6.5, bearing: 0, duration: 1000, padding: { right: paddingDerecho, left: 0, top: 0, bottom: 0 } });
 
     try {
       const conn = await duckDb.connect();
@@ -192,7 +195,8 @@ export default function ChileMap() {
     setActivosLakehouse(null);
     setIdLakehouseActual(null);
     setTablaActiva(null);
-    mapRef.current?.flyTo({ center: [-71.0, -39.0], zoom: 4, duration: 1000, padding: { right: 0, left: 0, top: 0, bottom: 0 } });
+    setCurrentMapStyle(DEFAULT_MAP_STYLE);
+    mapRef.current?.flyTo({ center: [-71.0, -39.0], zoom: 4, bearing: 90, duration: 1000, padding: { right: 0, left: 0, top: 0, bottom: 0 } });
   };
 
   return (
@@ -208,7 +212,7 @@ export default function ChileMap() {
 
       {/* MAPA BASE */}
       <div className="absolute inset-0 w-full h-full z-0">
-        <Map ref={mapRef} initialViewState={{ longitude: -71.0, latitude: -39.0, zoom: 4, bearing: 90, pitch: 0 }} style={{ width: "100%", height: "100%" }} mapStyle={MAP_STYLE} minZoom={1} maxZoom={10} interactiveLayerIds={["marcadores-layer"]} onClick={onMapClick} cursor={cursor} onMouseEnter={(e) => { if (e.features?.length) setCursor("pointer") }} onMouseLeave={() => setCursor("grab")}>
+        <Map ref={mapRef} initialViewState={{ longitude: -71.0, latitude: -39.0, zoom: 4, bearing: 90, pitch: 0 }} style={{ width: "100%", height: "100%" }} mapStyle={currentMapStyle} minZoom={1} maxZoom={10} interactiveLayerIds={["marcadores-layer"]} onClick={onMapClick} cursor={cursor} onMouseEnter={(e) => { if (e.features?.length) setCursor("pointer") }} onMouseLeave={() => setCursor("grab")}>
           <NavigationControl position="bottom-left" />
           {maskData && <Source id="world-mask" type="geojson" data={maskData}><Layer id="mask-layer" type="fill" paint={{ "fill-color": "#ffffff", "fill-opacity": 1 }} /></Source>}
           {chileOutline && <Source id="chile-border" type="geojson" data={chileOutline}><Layer id="border-layer" type="line" paint={{ "line-color": "#000000", "line-width": 1, "line-opacity": 0.15 }} /></Source>}
