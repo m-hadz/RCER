@@ -24,10 +24,13 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="es" // Cambié esto a "es" asumiendo que tu app será en español
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      {/* Agregamos bg-white y text-black aquí */}
+      <body className="min-h-full flex flex-col bg-white text-black">
+        {children}
+      </body>
     </html>
   );
 }
