@@ -154,6 +154,9 @@ INSERT INTO Centro_investigacion (workspace_id, nombre, workspace_nombre, ambien
 ('ws_cda', 'CDA', 'Workspace Dev — CDA', 'DEV'),
 ('ws_atacama', 'Atacama', 'Workspace Dev — Estación Atacama', 'DEV'),
 ('ws_torre', 'Torre de Control', 'Workspace RCER UC — Torre de Control', 'PROD');
+INSERT INTO Centro_investigacion (workspace_id, nombre, workspace_nombre, ambiente) VALUES 
+('ws_loa', 'LOA', 'Workspace Dev — Estación Loa', 'DEV'),
+('ws_cedel', 'CEDEL', 'Workspace Dev — CEDEL', 'DEV');
 
 -- ==========================================
 -- 2. RELACIÓN R6: Compartición de Esquemas
@@ -171,6 +174,11 @@ INSERT INTO Entorno_datos (lakehouse_id, workspace_id, capa, tipo, ambiente) VAL
 ('wh_pat_gold', 'ws_patagonia', 'Gold', 'Warehouse SQL', 'PROD'),
 ('lh_cda_silver', 'ws_cda', 'Silver', 'Lakehouse', 'DEV'),
 ('lh_ata_silver', 'ws_atacama', 'Silver', 'Lakehouse', 'DEV');
+INSERT INTO Entorno_datos (lakehouse_id, workspace_id, capa, tipo, ambiente) VALUES 
+('lh_pat_silver', 'ws_patagonia', 'Silver', 'Lakehouse', 'DEV'),
+('lh_loa_bronze', 'ws_loa', 'Bronze', 'Lakehouse', 'DEV'),
+('lh_cedel_bronze', 'ws_cedel', 'Bronze', 'Lakehouse', 'DEV'),
+('lh_torre_bronze', 'ws_torre', 'Bronze', 'Lakehouse', 'PROD');
 
 -- ==========================================
 -- 4. RELACIÓN R2: Activos Físicos (Tablas)
@@ -181,6 +189,13 @@ INSERT INTO Activo_fisico (nombre_tabla, lakehouse_id, total_registros, fecha_in
 ('thies_av1', 'wh_pat_gold', 221588, '2018-12-15', '2026-05-19', 'Fecha'),
 ('sensores_hidrometricos_maldonado', 'lh_pat_bronze', 6373, '2023-09-02', '2024-01-13', 'Fecha_Tiempo'),
 ('cr1000xseries_hourly', 'lh_ata_silver', 811, '2025-07-29', '2025-09-01', 'TIMESTAMP');
+INSERT INTO Activo_fisico (nombre_tabla, lakehouse_id, total_registros, fecha_inicio, fecha_fin, col_temporal) VALUES 
+('thies_av1_hourly', 'lh_pat_silver', 11902, '2021-03-12', '2026-04-19', 'Fecha'),
+('camaras_trampa', 'lh_pat_silver', 153, '2019-04-09', '2023-11-07', 'Date_picture'),
+('cr1000xseries_table10min', 'lh_ata_silver', 4867, '2025-07-29', '2025-09-01', 'TIMESTAMP'),
+('loa_prospeccion_2023', 'lh_loa_bronze', 250, '2023-04-24', '2023-04-26', 'fecha'),
+('participantes_iie_2024', 'lh_cedel_bronze', 558, NULL, NULL, NULL),
+('tabla_metadatos_saviia', 'lh_torre_bronze', 19, NULL, NULL, NULL);
 
 -- ==========================================
 -- 5. PUENTE SEMÁNTICO: Variables Conceptuales
@@ -202,6 +217,22 @@ INSERT INTO Campo_estructural (nombre_campo, nombre_tabla, lakehouse_id, tipo_da
 ('AirTC_Avg', 'cr1000xseries_hourly', 'lh_ata_silver', 'double', 'Sí', 'No', 1),
 ('TIMESTAMP', 'cr1000xseries_hourly', 'lh_ata_silver', 'timestamp', 'Sí', 'Sí', NULL);
 
+-- Campos de Cámaras Trampa (Patagonia)
+INSERT INTO Campo_estructural (nombre_campo, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal, id_variable) VALUES 
+('Date_picture', 'camaras_trampa', 'lh_pat_silver', 'date', 'Sí', 'Sí', NULL),
+('Descrip_picture', 'camaras_trampa', 'lh_pat_silver', 'string', 'Sí', 'No', NULL);
+
+-- Campos Arqueológicos (LOA)
+INSERT INTO Campo_estructural (nombre_campo, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal, id_variable) VALUES 
+('fecha', 'loa_prospeccion_2023', 'lh_loa_bronze', 'string', 'Sí', 'Sí', NULL),
+('utm_e', 'loa_prospeccion_2023', 'lh_loa_bronze', 'string', 'Sí', 'No', NULL),
+('ceramica_mon', 'loa_prospeccion_2023', 'lh_loa_bronze', 'string', 'Sí', 'No', NULL);
+
+-- Campos de Congreso (CEDEL)
+INSERT INTO Campo_estructural (nombre_campo, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal, id_variable) VALUES 
+('especialidad_participante', 'participantes_iie_2024', 'lh_cedel_bronze', 'string', 'Sí', 'No', NULL),
+('tipo_participacion_congreso', 'participantes_iie_2024', 'lh_cedel_bronze', 'string', 'Sí', 'No', NULL);
+
 -- ==========================================
 -- 7. NODO DATASET: Metadatos de Estaciones
 -- ==========================================
@@ -216,7 +247,16 @@ INSERT INTO Metadata (id_saviia, id_centro_estacion, title, kindofdata, subject,
 INSERT INTO Gobernanza_Torre_Control (id_saviia, id_centro_estacion, title, subject, latitude, longitude, accesslevel) VALUES 
 ('ds_ata_clima', 'ws_atacama', 'Climatología CR1000X', 'Meteorología', '-22.912', '-68.199', 'Público'),
 ('ds_cda_neblina', 'ws_cda', 'Red Sensores Neblina', 'Meteorología', '-27.111', '-70.222', 'Restringido');
+INSERT INTO Metadata (id_saviia, id_centro_estacion, title, kindofdata, subject, latitude, longitude) VALUES 
+('ds_loa_arq', 'ws_loa', 'Prospección Arqueológica LOA 2023', 'Survey Data', 'Arqueología', '-21.450', '-69.010'),
+('ds_cedel_iie', 'ws_cedel', 'Participantes Congreso IIE 2024', 'Administrative Data', 'Educación', '-39.280', '-71.980');
+
+INSERT INTO Gobernanza_Torre_Control (id_saviia, id_centro_estacion, title, subject, accesslevel) VALUES 
+('ds_loa_arq', 'ws_loa', 'Prospección Arqueológica LOA 2023', 'Arqueología', 'Restringido'),
+('ds_cedel_iie', 'ws_cedel', 'Participantes Congreso IIE 2024', 'Educación', 'Restringido');
 
 UPDATE Gobernanza_Torre_Control SET stationname = title WHERE stationname IS NULL;
 UPDATE Metadata SET stationname = title WHERE stationname IS NULL;
 UPDATE Metadata SET accesslevel = 'Público' WHERE id_centro_estacion = 'ws_patagonia';
+UPDATE Gobernanza_Torre_Control SET stationname = title WHERE stationname IS NULL AND id_saviia IN ('ds_loa_arq', 'ds_cedel_iie');
+UPDATE Metadata SET stationname = title WHERE stationname IS NULL AND id_saviia IN ('ds_loa_arq', 'ds_cedel_iie');
