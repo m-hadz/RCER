@@ -11,11 +11,20 @@ const DEFAULT_MAP_STYLE_URL = `https://api.maptiler.com/maps/019e8e0d-6eac-7277-
 const OUTDOOR_MAP_STYLE_URL = `https://api.maptiler.com/maps/outdoor-v4/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
 
 const QUERY_MARCADORES = `
-  SELECT id_saviia, id_centro_estacion, title AS nombre, latitude AS latitud, longitude AS longitud
-  FROM Gobernanza_Torre_Control
-  UNION 
-  SELECT id_saviia, id_centro_estacion, title AS nombre, latitude AS latitud, longitude AS longitud
-  FROM Metadata;
+  SELECT 
+    id_saviia, 
+    MAX(id_centro_estacion) AS id_centro_estacion, 
+    MAX(nombre) AS nombre, 
+    MAX(latitud) AS latitud, 
+    MAX(longitud) AS longitud
+  FROM (
+    SELECT id_saviia, id_centro_estacion, title AS nombre, latitude AS latitud, longitude AS longitud
+    FROM Gobernanza_Torre_Control
+    UNION ALL
+    SELECT id_saviia, id_centro_estacion, title AS nombre, latitude AS latitud, longitude AS longitud
+    FROM Metadata
+  ) AS combined
+  GROUP BY id_saviia;
 `;
 
 const formatearFecha = (valor: any) => {
@@ -62,6 +71,8 @@ export default function ChileMap() {
   const [tablaActiva, setTablaActiva] = React.useState<any | null>(null);
   const [detalleTabla, setDetalleTabla] = React.useState<{ campos: any[], linaje: any[], metadatos: any[] } | null>(null);
   const [cargandoDetalleTabla, setCargandoDetalleTabla] = React.useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = React.useState<string>("");
+  const [searchMinimized, setSearchMinimized] = React.useState<boolean>(false);
 
   const { duckDb, loading, error } = useDuckDb();
 
@@ -94,6 +105,18 @@ export default function ChileMap() {
     };
   }, [filas]);
 
+  const searchPlacesFiltered = React.useMemo(() => {
+    if (!filas || filas.length === 0) return [];
+    const sorted = [...filas]
+      .filter((f) => f.nombre)
+      .sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), "es"));
+
+    if (!searchQuery.trim()) return sorted;
+
+    const query = searchQuery.toLowerCase();
+    return sorted.filter((f) => String(f.nombre).toLowerCase().includes(query));
+  }, [filas, searchQuery]);
+
   const syncMaps = (sourceRef: React.RefObject<MapRef | null>, targetRef: React.RefObject<MapRef | null>) => {
     const source = sourceRef.current?.getMap();
     const target = targetRef.current?.getMap();
@@ -108,11 +131,7 @@ export default function ChileMap() {
     }
   };
 
-  const onMapClick = React.useCallback(async (event: MapLayerMouseEvent) => {
-    const feature = event.features?.[0];
-    if (!feature || feature.layer?.id !== "marcadores-layer") return;
-
-    const { id_saviia, id_centro_estacion } = feature.properties as any;
+  const seleccionarPunto = React.useCallback(async (id_saviia: string, id_centro_estacion: string | null, targetLng: number, targetLat: number) => {
     if (!id_saviia || !duckDb) return;
 
     setSelectedSaviiaId(id_saviia);
@@ -124,38 +143,45 @@ export default function ChileMap() {
     setDetalleTabla(null);
     setIdCentroActual(id_centro_estacion || null);
 
-    const paddingDerecho = window.innerWidth * 0.66;
-    const coords = (feature.geometry as any).coordinates;
-    const targetLng = coords[0];
-    const targetLat = coords[1];
+    const hasCoords = targetLng != null && targetLat != null && !isNaN(targetLng) && !isNaN(targetLat) && targetLng !== 0 && targetLat !== 0;
 
-    const flightOptions = {
-      center: [targetLng, targetLat] as [number, number],
-      zoom: 6.5,
-      bearing: 0,
-      padding: { right: paddingDerecho, left: 0, top: 0, bottom: 0 },
-      duration: 1000
-    };
+    if (hasCoords) {
+      const flightOptions = {
+        center: [targetLng, targetLat] as [number, number],
+        zoom: 6.5,
+        bearing: 0,
+        padding: { right: 0, left: 0, top: 0, bottom: 0 },
+        duration: 1000
+      };
 
-    setIsAnimatingMap(true);
+      setIsAnimatingMap(true);
 
-    if (!outdoorInitialState) {
-      setOutdoorInitialState({ longitude: targetLng, latitude: targetLat, zoom: 6.5, bearing: 0, pitch: 0 });
-      const { duration, ...jumpOptions } = flightOptions;
-      pendingOutdoorFlight.current = jumpOptions;
+      if (!outdoorInitialState) {
+        setOutdoorInitialState({ longitude: targetLng, latitude: targetLat, zoom: 6.5, bearing: 0, pitch: 0 });
+        const { duration, ...jumpOptions } = flightOptions;
+        pendingOutdoorFlight.current = jumpOptions;
+      } else {
+        const { duration, ...jumpOptions } = flightOptions;
+        mapRefOutdoor.current?.jumpTo(jumpOptions);
+      }
+
+      setTimeout(() => {
+        try {
+          mapRefDefault.current?.getMap().resize();
+        } catch (e) {}
+        try {
+          mapRefOutdoor.current?.getMap().resize();
+        } catch (e) {}
+        mapRefDefault.current?.flyTo(flightOptions);
+      }, 50);
+
+      setTimeout(() => {
+        setIsOutdoorMode(true);
+        setIsAnimatingMap(false);
+      }, 1000);
     } else {
-      const { duration, ...jumpOptions } = flightOptions;
-      mapRefOutdoor.current?.jumpTo(jumpOptions);
-    }
-
-    setTimeout(() => {
-      mapRefDefault.current?.flyTo(flightOptions);
-    }, 10);
-
-    setTimeout(() => {
       setIsOutdoorMode(true);
-      setIsAnimatingMap(false);
-    }, 1000);
+    }
 
     try {
       const conn = await duckDb.connect();
@@ -173,6 +199,18 @@ export default function ChileMap() {
       await conn.close();
     } catch (err) { console.error(err); }
   }, [duckDb, outdoorInitialState]);
+
+  const onMapClick = React.useCallback(async (event: MapLayerMouseEvent) => {
+    const feature = event.features?.[0];
+    if (!feature || feature.layer?.id !== "marcadores-layer") return;
+
+    const { id_saviia, id_centro_estacion } = feature.properties as any;
+    const coords = (feature.geometry as any).coordinates;
+    const targetLng = coords[0];
+    const targetLat = coords[1];
+
+    seleccionarPunto(id_saviia, id_centro_estacion, targetLng, targetLat);
+  }, [seleccionarPunto]);
 
   const explorarCentro = async () => {
     if (!idCentroActual || !duckDb) return;
@@ -219,6 +257,8 @@ export default function ChileMap() {
   const cerrarDetalle = () => {
     setDetalleSeleccionado(null);
     setSelectedSaviiaId(null);
+    setSearchQuery("");
+    setSearchMinimized(false);
     setEntornosCentro(null);
     setActivosLakehouse(null);
     setIdLakehouseActual(null);
@@ -237,6 +277,9 @@ export default function ChileMap() {
         curve: 0.5
       };
 
+      try {
+        mapRefDefault.current?.getMap().resize();
+      } catch (e) {}
       mapRefDefault.current?.flyTo(targetState);
     }, 200);
 
@@ -314,14 +357,120 @@ export default function ChileMap() {
 
       {loading && <div className="absolute z-50 top-10 left-10 bg-white px-4 py-2 text-black rounded-md shadow-md border border-gray-100">Iniciando catálogo...</div>}
 
-      {detalleSeleccionado && (
-        <button onClick={cerrarDetalle} className="absolute top-6 left-6 z-30 flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm hover:bg-white transition-colors rounded-md text-sm font-medium border border-gray-200 shadow-sm text-gray-800">
-          ← Volver al mapa
-        </button>
-      )}
+      {/* CONTENEDOR IZQUIERDO (Mapa + Buscador de Estaciones) */}
+      <div className={`absolute left-0 top-0 h-full z-10 flex flex-col bg-white ${selectedSaviiaId ? "w-1/3 border-r border-gray-200" : "w-full"}`}>
+        
+        {/* LISTADO DE LUGARES Y BUSCADOR (Visible solo cuando hay un punto seleccionado) */}
+        {selectedSaviiaId && (
+          searchMinimized ? (
+            /* MINIMIZED STATE */
+            <div className="h-[56px] min-h-[56px] flex-none bg-gray-50/80 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between border-b border-gray-200 transition-all duration-300 animate-in fade-in">
+              <button
+                onClick={cerrarDetalle}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-gray-50 transition-colors rounded-lg text-xs font-semibold border border-gray-200 shadow-sm text-gray-800"
+              >
+                ← Volver al mapa
+              </button>
+              <button
+                onClick={() => setSearchMinimized(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200/50 active:bg-gray-200 transition-colors rounded-lg flex items-center justify-center bg-transparent border-0"
+                title="Expandir buscador"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            /* EXPANDED STATE */
+            <div className="flex-1 flex flex-col min-h-0 bg-gray-50/50 p-4 transition-all duration-300 animate-in fade-in">
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  onClick={cerrarDetalle}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-gray-50 transition-colors rounded-lg text-xs font-semibold border border-gray-200 shadow-sm text-gray-800"
+                >
+                  ← Volver al mapa
+                </button>
+                <button
+                  onClick={() => setSearchMinimized(true)}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200/50 active:bg-gray-200 transition-colors rounded-lg flex items-center justify-center bg-transparent border-0"
+                  title="Minimizar buscador"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+              </div>
 
-      <div className="absolute inset-0 w-full h-full z-0 bg-gray-100">
-        <div className={`w-full h-full origin-center transition-all duration-700 ease-in-out ${mapaCargado ? "opacity-100" : "opacity-0"} ${isAnimatingMap ? "blur-[3px] scale-[1.01]" : "blur-0 scale-100"}`}>
+              <div className="mb-3">
+                <div className="flex items-center gap-2">
+                <label htmlFor="buscar-estacion" className="shrink-0 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Buscar
+                </label>
+                <div className="relative flex-1">
+                  <input
+                    id="buscar-estacion"
+                    type="text"
+                    placeholder="Escribe el nombre de la estación..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-gray-900 font-medium placeholder-gray-400"
+                  />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto min-h-0 border border-gray-100 rounded-lg bg-white shadow-inner">
+                <ul className="divide-y divide-gray-100">
+                  {searchPlacesFiltered.map((lugar) => {
+                    const isSelected = selectedSaviiaId === lugar.id_saviia;
+                    return (
+                      <li key={lugar.id_saviia}>
+                        <button
+                          onClick={() => seleccionarPunto(lugar.id_saviia, lugar.id_centro_estacion, Number(lugar.longitud), Number(lugar.latitud))}
+                          className={`w-full text-left px-4 py-3 text-sm font-medium transition-all flex items-center justify-between hover:bg-gray-50 ${
+                            isSelected
+                              ? "bg-emerald-50/70 text-emerald-800 border-l-4 border-emerald-500 pl-3"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <span className="truncate pr-4">{lugar.nombre}</span>
+                          {isSelected && (
+                            <span className="shrink-0 text-emerald-600 bg-emerald-100/70 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                              Seleccionado
+                          </span>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                  {searchPlacesFiltered.length === 0 && (
+                    <li className="px-4 py-8 text-center text-gray-400 text-sm italic">
+                      No se encontraron estaciones
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          )
+        )}
+
+        <div className={`relative w-full bg-gray-100 transition-all duration-700 ease-in-out ${selectedSaviiaId ? (searchMinimized ? "flex-1" : "h-[75vh] border-t border-gray-200") : "h-full"} ${mapaCargado ? "opacity-100" : "opacity-0"} ${isAnimatingMap ? "blur-[3px] scale-[1.01]" : "blur-0 scale-100"}`}>
 
           {/* MAPA FANTASMA (Fondo - Outdoor) */}
           <div className={`absolute inset-0 z-0 transition-opacity duration-500 ease-in-out ${isOutdoorMode ? "opacity-100" : "opacity-0"}`}>
@@ -380,8 +529,15 @@ export default function ChileMap() {
       </div>
 
       {/* PANEL DESLIZANTE DERECHO */}
-      <div className={`absolute top-0 right-0 h-full w-2/3 bg-white border-l border-gray-200 shadow-2xl transition-transform duration-700 ease-in-out z-20 overflow-hidden flex flex-row ${detalleSeleccionado ? "translate-x-0" : "translate-x-full"}`}>
-        {detalleSeleccionado && (
+      <div className={`absolute top-0 right-0 h-full w-2/3 bg-white border-l border-gray-200 shadow-2xl transition-transform duration-700 ease-in-out z-20 overflow-hidden flex flex-row ${selectedSaviiaId ? "translate-x-0" : "translate-x-full"}`}>
+        {!detalleSeleccionado ? (
+          <div className="w-full h-full flex items-center justify-center bg-white p-8">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-gray-600 text-sm font-semibold">Cargando detalles de la estación...</p>
+            </div>
+          </div>
+        ) : (
           <>
             <div className={`h-full overflow-y-auto transition-all duration-500 ease-in-out border-r border-gray-200 ${!entornosCentro ? 'w-full p-8 md:p-12 opacity-100' : (entornosCentro && !activosLakehouse) ? 'w-1/2 p-8 md:p-12 opacity-100' : 'w-0 p-0 opacity-0 overflow-hidden border-r-0'}`}>
               <article className="max-w-3xl mx-auto whitespace-nowrap min-w-[400px]">
