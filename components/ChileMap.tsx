@@ -52,6 +52,7 @@ export default function ChileMap() {
   }, []);
 
   const [detalleSeleccionado, setDetalleSeleccionado] = React.useState<any | null>(null);
+  const [selectedSaviiaId, setSelectedSaviiaId] = React.useState<string | null>(null);
   const [idCentroActual, setIdCentroActual] = React.useState<string | null>(null);
   const [entornosCentro, setEntornosCentro] = React.useState<any[] | null>(null);
   const [cargandoEntornos, setCargandoEntornos] = React.useState<boolean>(false);
@@ -113,6 +114,8 @@ export default function ChileMap() {
 
     const { id_saviia, id_centro_estacion } = feature.properties as any;
     if (!id_saviia || !duckDb) return;
+
+    setSelectedSaviiaId(id_saviia);
 
     setEntornosCentro(null);
     setActivosLakehouse(null);
@@ -215,6 +218,7 @@ export default function ChileMap() {
 
   const cerrarDetalle = () => {
     setDetalleSeleccionado(null);
+    setSelectedSaviiaId(null);
     setEntornosCentro(null);
     setActivosLakehouse(null);
     setIdLakehouseActual(null);
@@ -256,7 +260,35 @@ export default function ChileMap() {
       )}
       <NavigationControl position="bottom-left" />
       {maskData && <Source id="world-mask" type="geojson" data={maskData}><Layer id="mask-layer" type="fill" paint={{ "fill-color": detalleSeleccionado ? "#a8c5ed" : "#ffffff", "fill-color-transition": { duration: 1000 }, "fill-opacity": 1 }} /></Source>}
-      {geojsonPuntos && <Source id="duckdb-marcadores" type="geojson" data={geojsonPuntos as any}><Layer id="marcadores-layer" type="circle" paint={{ "circle-radius": 7, "circle-color": "#ea580c", "circle-stroke-width": 1.5, "circle-stroke-color": "#ffffff" }} /></Source>}
+      {geojsonPuntos && (
+        <Source id="duckdb-marcadores" type="geojson" data={geojsonPuntos as any}>
+          <Layer
+            id="marcadores-layer"
+            type="circle"
+            paint={{
+              "circle-radius": [
+                "case",
+                ["==", ["get", "id_saviia"], selectedSaviiaId || ""],
+                10,
+                7
+              ] as any,
+              "circle-color": [
+                "case",
+                ["==", ["get", "id_saviia"], selectedSaviiaId || ""],
+                "#10b981",
+                "#ea580c"
+              ] as any,
+              "circle-stroke-width": [
+                "case",
+                ["==", ["get", "id_saviia"], selectedSaviiaId || ""],
+                2.5,
+                1.5
+              ] as any,
+              "circle-stroke-color": "#ffffff"
+            }}
+          />
+        </Source>
+      )}
     </>
   );
 
