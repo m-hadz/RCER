@@ -13,13 +13,10 @@ export function useDuckDb() {
 
     const init = async () => {
       try {
-        // 1. Obtenemos los bundles automáticamente desde el CDN de jsDelivr
         const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
 
-        // 2. DuckDB elige el mejor bundle según tu navegador (MVP o EH)
         const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
 
-        // 3. Creamos el Worker usando la URL segura del bundle
         const worker_url = URL.createObjectURL(
           new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
         );
@@ -28,276 +25,156 @@ export function useDuckDb() {
         const logger = new duckdb.ConsoleLogger();
         const database = new duckdb.AsyncDuckDB(logger, worker);
 
-        // 4. Instanciamos la base de datos
         await database.instantiate(bundle.mainModule, bundle.pthreadWorker);
         URL.revokeObjectURL(worker_url);
 
         const conn = await database.connect();
 
-        // === TU SQL SE MANTIENE EXACTAMENTE IGUAL ===
         await conn.query(`
-          CREATE TABLE Centro_investigacion (
+          CREATE TABLE Estacion (
     workspace_id VARCHAR(100) PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     workspace_nombre VARCHAR(255) NOT NULL,
-    ambiente VARCHAR(50)
+    tema VARCHAR(255),
+    descripcion VARCHAR,
+    ambiente VARCHAR(50),
+    latitud DOUBLE,
+    longitud DOUBLE
 );
 
-CREATE TABLE Centro_comparte_esquema (
-    workspace_id_origen VARCHAR(100),
-    workspace_id_destino VARCHAR(100),
-    tabla_referencia VARCHAR(100),
-    capa VARCHAR(50),
-    pct_campos_comunes DECIMAL(5,2),
-    
-    PRIMARY KEY (workspace_id_origen, workspace_id_destino, tabla_referencia, capa),
-    
-    FOREIGN KEY (workspace_id_origen) REFERENCES Centro_investigacion(workspace_id),
-    FOREIGN KEY (workspace_id_destino) REFERENCES Centro_investigacion(workspace_id)
-);
-
-CREATE TABLE Entorno_datos (
+CREATE TABLE Lakehouse (
     lakehouse_id VARCHAR(100) PRIMARY KEY,
     workspace_id VARCHAR(100) NOT NULL,
     capa VARCHAR(50) NOT NULL,
     tipo VARCHAR(100),
     ambiente VARCHAR(50),
-    
-    FOREIGN KEY (workspace_id) REFERENCES Centro_investigacion(workspace_id)
+
+    FOREIGN KEY (workspace_id) REFERENCES Estacion(workspace_id)
 );
 
-CREATE TABLE Activo_fisico (
+CREATE TABLE Tabla (
     nombre_tabla VARCHAR(100),
     lakehouse_id VARCHAR(100),
     total_registros BIGINT,
     fecha_inicio DATE,
     fecha_fin DATE,
     col_temporal VARCHAR(50),
-    
+
     PRIMARY KEY (nombre_tabla, lakehouse_id),
-    
-    FOREIGN KEY (lakehouse_id) REFERENCES Entorno_datos(lakehouse_id)
+
+    FOREIGN KEY (lakehouse_id) REFERENCES Lakehouse(lakehouse_id)
 );
 
-CREATE SEQUENCE seq_id_variable;
-
-CREATE TABLE Variable (
-    id_variable INTEGER DEFAULT nextval('seq_id_variable') PRIMARY KEY,
-    nombre_variable VARCHAR(100) NOT NULL,
-    unidad VARCHAR(50),
-    sensor_origen VARCHAR(100)
-);
-
-CREATE TABLE Campo_estructural (
-    nombre_campo VARCHAR(100),
+CREATE TABLE Columnas (
     nombre_tabla VARCHAR(100),
     lakehouse_id VARCHAR(100),
-    
+
+    nombre_columna VARCHAR(50),
     tipo_dato VARCHAR(50),
-    es_nullable VARCHAR(10),
-    es_temporal VARCHAR(10),
-    
-    id_variable INT,
-    
-    PRIMARY KEY (nombre_campo, nombre_tabla, lakehouse_id),
-    
-    FOREIGN KEY (nombre_tabla, lakehouse_id) REFERENCES Activo_fisico(nombre_tabla, lakehouse_id),
-    
-    FOREIGN KEY (id_variable) REFERENCES Variable(id_variable)
-);
+    es_nullable BOOLEAN,
+    es_temporal BOOLEAN,
 
-CREATE TABLE Metadata (
-    id_saviia VARCHAR(100) PRIMARY KEY,
-    
-    id_centro_estacion VARCHAR(100),
-    
-    id_tiporegistro VARCHAR(100),
-    id_proceso VARCHAR(100),
-    
-    title VARCHAR,
-    stationname VARCHAR,
-    subtitle VARCHAR,
-    depositor VARCHAR,
-    dateofcollection VARCHAR,
-    subject VARCHAR,
-    keyword VARCHAR,
-    author VARCHAR,
-    authorname VARCHAR,
-    dateofdeposit VARCHAR,
-    language VARCHAR,
-    kindofdata VARCHAR,
-    dsdescription VARCHAR,
-    dsdescriptionvalue VARCHAR,
-    
-    latitude VARCHAR,
-    longitude VARCHAR,
-    geographiccoverage VARCHAR,
-    country VARCHAR,
-    state VARCHAR,
-    city VARCHAR,
-    othergeographiccoverage VARCHAR,
-    
-    timeperiodcovered VARCHAR,
-    timeperiodcoveredstart VARCHAR,
-    timeperiodcoveredend VARCHAR,
-    
-    format VARCHAR,
-    accesslevel VARCHAR,
-    rights VARCHAR,
-    license VARCHAR,
-    
-    alternativetitle VARCHAR,
-    publication VARCHAR,
-    notestext VARCHAR,
-    
-    FOREIGN KEY (id_centro_estacion) REFERENCES Centro_investigacion(workspace_id)
-);
+    PRIMARY KEY (nombre_tabla, lakehouse_id, nombre_columna),
 
-CREATE TABLE Gobernanza_Torre_Control (
-    id_saviia VARCHAR(100) PRIMARY KEY,
-    
-    id_centro_estacion VARCHAR(100),
-    
-    id_tiporegistro VARCHAR(100),
-    id_proceso VARCHAR(100),
-    
-    title VARCHAR,
-    stationname VARCHAR,
-    subject VARCHAR,
-    keyword VARCHAR,
-    author VARCHAR,
-    
-    latitude VARCHAR,
-    longitude VARCHAR,
-    geographiccoverage VARCHAR,
-    country VARCHAR,
-    
-    timeperiodcoveredstart VARCHAR,
-    timeperiodcoveredend VARCHAR,
-    
-    accesslevel VARCHAR,
-    rights VARCHAR,
-    license VARCHAR,
-    
-    origen_tabla VARCHAR,
-
-    FOREIGN KEY (id_centro_estacion) REFERENCES Centro_investigacion(workspace_id)
+    FOREIGN KEY (nombre_tabla, lakehouse_id) REFERENCES Tabla(nombre_tabla, lakehouse_id)
 );
 
 -- ==========================================
--- 1. NODOS BASE: Centros de Investigación
+-- 1. NODOS BASE: Estaciones
 -- ==========================================
-INSERT INTO Centro_investigacion (workspace_id, nombre, workspace_nombre, ambiente) VALUES 
-('ws_patagonia', 'Centro Patagonia', 'Workspace Dev / Prod — Estación Patagonia', 'DEV/PROD'),
-('ws_cda', 'CDA', 'Workspace Dev — CDA', 'DEV'),
-('ws_atacama', 'Atacama', 'Workspace Dev — Estación Atacama', 'DEV'),
-('ws_torre', 'Torre de Control', 'Workspace RCER UC — Torre de Control', 'PROD');
-INSERT INTO Centro_investigacion (workspace_id, nombre, workspace_nombre, ambiente) VALUES 
-('ws_loa', 'LOA', 'Workspace Dev — Estación Loa', 'DEV'),
-('ws_cedel', 'CEDEL', 'Workspace Dev — CEDEL', 'DEV');
+INSERT INTO Estacion (workspace_id, nombre, workspace_nombre, tema, descripcion, ambiente, latitud, longitud) VALUES 
+('ws_patagonia', 'Centro Patagonia', 'Workspace Dev / Prod — Estación Patagonia', 'Ecología y Cambio Climático', 'Estudio de ecosistemas australes, monitoreo de flora y fauna mediante cámaras trampa, y dinámica climática para impulsar la ciencia en el territorio.', 'DEV/PROD', -35.123, -71.456),
+('ws_cda', 'CDA', 'Workspace Dev — CDA', 'Estudios de Aridez', 'Investigación sobre adaptación a la extrema aridez, captación de niebla y recursos hídricos en el ecosistema del desierto.', 'DEV', -27.111, -70.222),
+('ws_atacama', 'Atacama', 'Workspace Dev — Estación Atacama', 'Geología y Clima Extremo', 'Análisis de formaciones geológicas y recolección continua de datos meteorológicos y atmosféricos en el desierto de Atacama.', 'DEV', -22.912, -68.199),
+('ws_torre', 'Torre de Control', 'Workspace RCER UC — Torre de Control', 'Coordinación Científica', 'Centro neurálgico para la gestión integral, cruce de datos inter-estaciones y administración centralizada de la red de conocimientos.', 'PROD', -33.456, -70.654);
+
+INSERT INTO Estacion (workspace_id, nombre, workspace_nombre, tema, descripcion, ambiente, latitud, longitud) VALUES 
+('ws_loa', 'LOA', 'Workspace Dev — Estación Loa', 'Arqueología y Patrimonio', 'Prospección territorial, registro de hallazgos como material cerámico y preservación del patrimonio cultural en la cuenca del río Loa.', 'DEV', -21.450, -69.010),
+('ws_cedel', 'CEDEL', 'Workspace Dev — CEDEL', 'Desarrollo Local y Educación', 'Centro dedicado al desarrollo sustentable, integración comunitaria, y organización de congresos e instancias de participación territorial.', 'DEV', -39.280, -71.980);
 
 -- ==========================================
--- 2. RELACIÓN R6: Compartición de Esquemas
+-- 2. RELACIÓN R1: Lakehouses
 -- ==========================================
--- El documento menciona explícitamente que Patagonia DEV comparte con PROD y Atacama Silver con Gold
-INSERT INTO Centro_comparte_esquema (workspace_id_origen, workspace_id_destino, tabla_referencia, capa, pct_campos_comunes) VALUES 
-('ws_patagonia', 'ws_patagonia', 'thies_av1', 'Bronze-Gold', 85.50),
-('ws_atacama', 'ws_atacama', 'cr1000xseries', 'Silver-Gold', 100.00);
-
--- ==========================================
--- 3. RELACIÓN R1: Entornos de Datos (Lakehouses)
--- ==========================================
-INSERT INTO Entorno_datos (lakehouse_id, workspace_id, capa, tipo, ambiente) VALUES 
+INSERT INTO Lakehouse (lakehouse_id, workspace_id, capa, tipo, ambiente) VALUES 
 ('lh_pat_bronze', 'ws_patagonia', 'Bronze', 'Lakehouse', 'DEV'),
 ('wh_pat_gold', 'ws_patagonia', 'Gold', 'Warehouse SQL', 'PROD'),
 ('lh_cda_silver', 'ws_cda', 'Silver', 'Lakehouse', 'DEV'),
 ('lh_ata_silver', 'ws_atacama', 'Silver', 'Lakehouse', 'DEV');
-INSERT INTO Entorno_datos (lakehouse_id, workspace_id, capa, tipo, ambiente) VALUES 
+
+INSERT INTO Lakehouse (lakehouse_id, workspace_id, capa, tipo, ambiente) VALUES 
 ('lh_pat_silver', 'ws_patagonia', 'Silver', 'Lakehouse', 'DEV'),
 ('lh_loa_bronze', 'ws_loa', 'Bronze', 'Lakehouse', 'DEV'),
 ('lh_cedel_bronze', 'ws_cedel', 'Bronze', 'Lakehouse', 'DEV'),
 ('lh_torre_bronze', 'ws_torre', 'Bronze', 'Lakehouse', 'PROD');
 
 -- ==========================================
--- 4. RELACIÓN R2: Activos Físicos (Tablas)
+-- 3. RELACIÓN R2: Tablas (Modern Data Stack & Semántica)
 -- ==========================================
--- Incluimos los más de 60 millones de registros de Patagonia DEV
-INSERT INTO Activo_fisico (nombre_tabla, lakehouse_id, total_registros, fecha_inicio, fecha_fin, col_temporal) VALUES 
-('thies_av1', 'lh_pat_bronze', 60064541, '2018-12-15', '2026-05-09', 'Date'),
-('thies_av1', 'wh_pat_gold', 221588, '2018-12-15', '2026-05-19', 'Fecha'),
-('sensores_hidrometricos_maldonado', 'lh_pat_bronze', 6373, '2023-09-02', '2024-01-13', 'Fecha_Tiempo'),
-('cr1000xseries_hourly', 'lh_ata_silver', 811, '2025-07-29', '2025-09-01', 'TIMESTAMP');
-INSERT INTO Activo_fisico (nombre_tabla, lakehouse_id, total_registros, fecha_inicio, fecha_fin, col_temporal) VALUES 
-('thies_av1_hourly', 'lh_pat_silver', 11902, '2021-03-12', '2026-04-19', 'Fecha'),
-('camaras_trampa', 'lh_pat_silver', 153, '2019-04-09', '2023-11-07', 'Date_picture'),
-('cr1000xseries_table10min', 'lh_ata_silver', 4867, '2025-07-29', '2025-09-01', 'TIMESTAMP'),
-('loa_prospeccion_2023', 'lh_loa_bronze', 250, '2023-04-24', '2023-04-26', 'fecha'),
-('participantes_iie_2024', 'lh_cedel_bronze', 558, NULL, NULL, NULL),
-('tabla_metadatos_saviia', 'lh_torre_bronze', 19, NULL, NULL, NULL);
+
+-- Patagonia: Manteniendo el volumen masivo, pero añadiendo metadatos de formato de tabla (ej. Apache Iceberg) y visión computacional
+INSERT INTO Tabla (nombre_tabla, lakehouse_id, total_registros, fecha_inicio, fecha_fin, col_temporal) VALUES 
+('thies_av1_raw', 'lh_pat_bronze', 60064541, '2018-12-15', '2026-05-09', 'timestamp_utc'),
+('patagonia_iceberg_manifests', 'wh_pat_gold', 142, '2023-01-01', '2026-05-19', 'commit_time'),
+('camaras_trampa_cv_bbox', 'lh_pat_silver', 84530, '2019-04-09', '2023-11-07', 'capture_date');
+
+-- Atacama y CDA: Optimizaciones para lectura rápida
+INSERT INTO Tabla (nombre_tabla, lakehouse_id, total_registros, fecha_inicio, fecha_fin, col_temporal) VALUES 
+('cr1000x_duckdb_optimized', 'lh_ata_silver', 450890, '2025-07-29', '2025-09-01', 'TIMESTAMP_ISO'),
+('cr1000xseries_table10min', 'lh_ata_silver', 4867, '2025-07-29', '2025-09-01', 'TIMESTAMP_ISO'),
+('cda_niebla_sensores', 'lh_cda_silver', 120500, '2024-01-01', '2025-12-31', 'fecha_lectura');
+
+-- LOA (Arqueología): Evolucionado de un Excel plano a un modelo de Grafo de Conocimiento y GeoJSON
+INSERT INTO Tabla (nombre_tabla, lakehouse_id, total_registros, fecha_inicio, fecha_fin, col_temporal) VALUES 
+('loa_arkg_triples', 'lh_loa_bronze', 254000, NULL, NULL, 'extraction_date'),
+('loa_prospeccion_geo', 'lh_loa_bronze', 3420, '2023-04-24', '2023-04-26', 'fecha_hallazgo');
+
+-- Torre y CEDEL: Nodos de federación y participación
+INSERT INTO Tabla (nombre_tabla, lakehouse_id, total_registros, fecha_inicio, fecha_fin, col_temporal) VALUES 
+('saviia_sparql_endpoints', 'lh_torre_bronze', 12, NULL, NULL, NULL),
+('participantes_iie_anonymized', 'lh_cedel_bronze', 558, NULL, NULL, 'registration_date');
 
 -- ==========================================
--- 5. PUENTE SEMÁNTICO: Variables Conceptuales
+-- 4. RELACIÓN R3: Columnas
 -- ==========================================
--- DuckDB asignará automáticamente id_variable = 1, 2 y 3
-INSERT INTO Variable (nombre_variable, unidad, sensor_origen) VALUES 
-('Temperatura', 'Celsius', 'Thies AV1 / CR1000X'),
-('Velocidad Viento', 'm/s', 'Thies AV1'),
-('Precipitación', 'mm', 'CDA Sensor');
 
--- ==========================================
--- 6. RELACIÓN R3: Campos Estructurales
--- ==========================================
--- Conectamos las columnas físicas con la variable conceptual (id_variable 1 = Temperatura)
-INSERT INTO Campo_estructural (nombre_campo, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal, id_variable) VALUES 
-('AirTemperature', 'thies_av1', 'lh_pat_bronze', 'double', 'Sí', 'No', 1),
-('Date', 'thies_av1', 'lh_pat_bronze', 'string', 'Sí', 'Sí', NULL),
-('Temperatura_C', 'thies_av1', 'wh_pat_gold', 'float', 'Sí', 'No', 1),
-('AirTC_Avg', 'cr1000xseries_hourly', 'lh_ata_silver', 'double', 'Sí', 'No', 1),
-('TIMESTAMP', 'cr1000xseries_hourly', 'lh_ata_silver', 'timestamp', 'Sí', 'Sí', NULL);
+-- Patagonia: Series de tiempo masivas e Iceberg
+INSERT INTO Columnas (nombre_columna, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal) VALUES 
+('timestamp_utc', 'thies_av1_raw', 'lh_pat_bronze', 'timestamp', FALSE, TRUE),
+('AirTemperature_C', 'thies_av1_raw', 'lh_pat_bronze', 'double', TRUE, FALSE),
+('snapshot_id', 'patagonia_iceberg_manifests', 'wh_pat_gold', 'bigint', FALSE, FALSE),
+('added_data_files_count', 'patagonia_iceberg_manifests', 'wh_pat_gold', 'int', FALSE, FALSE);
 
--- Campos de Cámaras Trampa (Patagonia)
-INSERT INTO Campo_estructural (nombre_campo, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal, id_variable) VALUES 
-('Date_picture', 'camaras_trampa', 'lh_pat_silver', 'date', 'Sí', 'Sí', NULL),
-('Descrip_picture', 'camaras_trampa', 'lh_pat_silver', 'string', 'Sí', 'No', NULL);
+-- Patagonia: Visión computacional para las cámaras trampa
+INSERT INTO Columnas (nombre_columna, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal) VALUES 
+('capture_date', 'camaras_trampa_cv_bbox', 'lh_pat_silver', 'date', FALSE, TRUE),
+('bounding_box_json', 'camaras_trampa_cv_bbox', 'lh_pat_silver', 'json', FALSE, FALSE),
+('confidence_score', 'camaras_trampa_cv_bbox', 'lh_pat_silver', 'float', FALSE, FALSE);
 
--- Campos Arqueológicos (LOA)
-INSERT INTO Campo_estructural (nombre_campo, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal, id_variable) VALUES 
-('fecha', 'loa_prospeccion_2023', 'lh_loa_bronze', 'string', 'Sí', 'Sí', NULL),
-('utm_e', 'loa_prospeccion_2023', 'lh_loa_bronze', 'string', 'Sí', 'No', NULL),
-('ceramica_mon', 'loa_prospeccion_2023', 'lh_loa_bronze', 'string', 'Sí', 'No', NULL);
+-- Atacama: Estructura tipada para ingesta
+INSERT INTO Columnas (nombre_columna, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal) VALUES 
+('TIMESTAMP_ISO', 'cr1000x_duckdb_optimized', 'lh_ata_silver', 'timestamp', FALSE, TRUE),
+('AirTC_Avg', 'cr1000x_duckdb_optimized', 'lh_ata_silver', 'double', TRUE, FALSE),
+('TIMESTAMP_ISO', 'cr1000xseries_table10min', 'lh_ata_silver', 'timestamp', FALSE, TRUE),
+('Solar_Radiation_Wm2', 'cr1000xseries_table10min', 'lh_ata_silver', 'double', TRUE, FALSE),
+('Soil_Moisture_VWC', 'cr1000xseries_table10min', 'lh_ata_silver', 'double', TRUE, FALSE),
+('Wind_Speed_ms', 'cr1000xseries_table10min', 'lh_ata_silver', 'double', TRUE, FALSE),
+('Albedo_Avg', 'cr1000xseries_table10min', 'lh_ata_silver', 'double', TRUE, FALSE),
+('Battery_Voltage_Min', 'cr1000xseries_table10min', 'lh_ata_silver', 'float', FALSE, FALSE),
+('Panel_Temperature_C', 'cr1000xseries_table10min', 'lh_ata_silver', 'float', FALSE, FALSE);
 
--- Campos de Congreso (CEDEL)
-INSERT INTO Campo_estructural (nombre_campo, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal, id_variable) VALUES 
-('especialidad_participante', 'participantes_iie_2024', 'lh_cedel_bronze', 'string', 'Sí', 'No', NULL),
-('tipo_participacion_congreso', 'participantes_iie_2024', 'lh_cedel_bronze', 'string', 'Sí', 'No', NULL);
+-- LOA (Arqueología): Esquema para ArKG (Arqueología Knowledge Graph) y Mapas
+INSERT INTO Columnas (nombre_columna, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal) VALUES 
+('subject_uri', 'loa_arkg_triples', 'lh_loa_bronze', 'string', FALSE, FALSE),
+('predicate_uri', 'loa_arkg_triples', 'lh_loa_bronze', 'string', FALSE, FALSE),
+('object_value', 'loa_arkg_triples', 'lh_loa_bronze', 'string', TRUE, FALSE),
+('geometry_geojson', 'loa_prospeccion_geo', 'lh_loa_bronze', 'json', FALSE, FALSE),
+('maplibre_cluster_id', 'loa_prospeccion_geo', 'lh_loa_bronze', 'int', TRUE, FALSE),
+('rdf_type', 'loa_prospeccion_geo', 'lh_loa_bronze', 'string', TRUE, FALSE);
 
--- ==========================================
--- 7. NODO DATASET: Metadatos de Estaciones
--- ==========================================
-INSERT INTO Metadata (id_saviia, id_centro_estacion, title, kindofdata, subject, latitude, longitude) VALUES 
-('ds_pat_meteo', 'ws_patagonia', 'Datos Meteorológicos Maldonado', 'Sensor Data', 'Climatología', '-47.123', '-72.456'),
-('ds_ata_clima', 'ws_atacama', 'Climatología CR1000X', 'Sensor Data', 'Meteorología', '-22.912', '-68.199');
-
--- ==========================================
--- 8. RELACIÓN R5: Gobernanza en Torre de Control
--- ==========================================
--- OJO: Patagonia no se inserta aquí por la regla especial del documento
-INSERT INTO Gobernanza_Torre_Control (id_saviia, id_centro_estacion, title, subject, latitude, longitude, accesslevel) VALUES 
-('ds_ata_clima', 'ws_atacama', 'Climatología CR1000X', 'Meteorología', '-22.912', '-68.199', 'Público'),
-('ds_cda_neblina', 'ws_cda', 'Red Sensores Neblina', 'Meteorología', '-27.111', '-70.222', 'Restringido');
-INSERT INTO Metadata (id_saviia, id_centro_estacion, title, kindofdata, subject, latitude, longitude) VALUES 
-('ds_loa_arq', 'ws_loa', 'Prospección Arqueológica LOA 2023', 'Survey Data', 'Arqueología', '-21.450', '-69.010'),
-('ds_cedel_iie', 'ws_cedel', 'Participantes Congreso IIE 2024', 'Administrative Data', 'Educación', '-39.280', '-71.980');
-
-INSERT INTO Gobernanza_Torre_Control (id_saviia, id_centro_estacion, title, subject, accesslevel) VALUES 
-('ds_loa_arq', 'ws_loa', 'Prospección Arqueológica LOA 2023', 'Arqueología', 'Restringido'),
-('ds_cedel_iie', 'ws_cedel', 'Participantes Congreso IIE 2024', 'Educación', 'Restringido');
-
-UPDATE Gobernanza_Torre_Control SET stationname = title WHERE stationname IS NULL;
-UPDATE Metadata SET stationname = title WHERE stationname IS NULL;
-UPDATE Metadata SET accesslevel = 'Público' WHERE id_centro_estacion = 'ws_patagonia';
-UPDATE Gobernanza_Torre_Control SET stationname = title WHERE stationname IS NULL AND id_saviia IN ('ds_loa_arq', 'ds_cedel_iie');
-UPDATE Metadata SET stationname = title WHERE stationname IS NULL AND id_saviia IN ('ds_loa_arq', 'ds_cedel_iie');
+-- Torre de control: Gestión de endpoints semánticos
+INSERT INTO Columnas (nombre_columna, nombre_tabla, lakehouse_id, tipo_dato, es_nullable, es_temporal) VALUES 
+('endpoint_url', 'saviia_sparql_endpoints', 'lh_torre_bronze', 'string', FALSE, FALSE),
+('ontology_version', 'saviia_sparql_endpoints', 'lh_torre_bronze', 'string', TRUE, FALSE);
         `);
 
         await conn.close();
