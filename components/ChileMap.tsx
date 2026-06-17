@@ -179,6 +179,30 @@ export default function ChileMap() {
       const data = await getDetalleEstacion(workspace_id);
       if (data) setDetalleSeleccionado(data);
     } catch (err) { console.error(err); }
+
+    setCargandoEntornos(true);
+    try {
+      const dataLakehouses = await getLakehouses(workspace_id);
+      setEntornosCentro(dataLakehouses);
+
+      if (dataLakehouses && dataLakehouses.length > 0) {
+        let selectedEnv = dataLakehouses.find((e: any) => e.capa === 'Gold');
+        if (!selectedEnv) selectedEnv = dataLakehouses.find((e: any) => e.capa === 'Silver');
+        if (!selectedEnv) selectedEnv = dataLakehouses.find((e: any) => e.capa === 'Bronze');
+        if (!selectedEnv) selectedEnv = dataLakehouses[0];
+
+        if (selectedEnv) {
+          setIdLakehouseActual(selectedEnv.lakehouse_id);
+          setCargandoActivos(true);
+          try {
+            const dataTablas = await getTablas(selectedEnv.lakehouse_id);
+            setActivosLakehouse(dataTablas);
+          } catch (err) { console.error(err); }
+          finally { setCargandoActivos(false); }
+        }
+      }
+    } catch (err) { console.error(err); }
+    finally { setCargandoEntornos(false); }
   }, [outdoorInitialState]);
 
   const onMapClick = React.useCallback(async (event: MapLayerMouseEvent) => {
@@ -192,16 +216,6 @@ export default function ChileMap() {
 
     seleccionarPunto(workspace_id, targetLng, targetLat);
   }, [seleccionarPunto]);
-
-  const explorarCentro = async () => {
-    if (!idCentroActual) return;
-    setCargandoEntornos(true);
-    try {
-      const data = await getLakehouses(idCentroActual);
-      setEntornosCentro(data);
-    } catch (err) { console.error(err); }
-    finally { setCargandoEntornos(false); }
-  };
 
   const explorarLakehouse = async (idLakehouse: string) => {
     setIdLakehouseActual(idLakehouse);
@@ -452,14 +466,11 @@ export default function ChileMap() {
           </div>
         ) : (
           <>
-            <div className={`h-full overflow-y-auto transition-all duration-500 ease-in-out border-r border-gray-200 ${!entornosCentro ? 'w-full p-8 md:p-12 opacity-100' : (entornosCentro && !activosLakehouse) ? 'w-1/2 p-8 md:p-12 opacity-100' : 'w-0 p-0 opacity-0 overflow-hidden border-r-0'}`}>
-              <article className="max-w-3xl mx-auto whitespace-nowrap min-w-[400px]">
+            <div className={`h-full overflow-y-auto transition-all duration-500 ease-in-out border-r border-gray-200 ${(activosLakehouse || cargandoActivos) ? 'w-1/2 p-8 md:p-12' : 'w-full p-8 md:p-12'}`}>
+              <article className="max-w-3xl mx-auto min-w-[400px]">
                 <header className="mb-8 border-b border-gray-200 pb-8 text-wrap">
                   <div className="flex flex-col 2xl:flex-row 2xl:items-start justify-between gap-6 mb-4">
                     <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900 flex-1 break-words">{detalleSeleccionado.nombre || "Sin Título"}</h1>
-                    {idCentroActual && !entornosCentro && (
-                      <button onClick={explorarCentro} disabled={cargandoEntornos} className="shrink-0 inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-md text-sm font-semibold transition-colors shadow-sm">{cargandoEntornos ? 'Consultando...' : 'Explorar Arquitectura'}</button>
-                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                     <span className="flex items-center gap-1"><strong className="font-semibold text-gray-900">Estación:</strong> <span className="break-words">{detalleSeleccionado.workspace_nombre}</span></span>
@@ -467,6 +478,23 @@ export default function ChileMap() {
                     <span className="flex items-center gap-1"><strong className="font-semibold text-gray-900">ID:</strong> <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">{detalleSeleccionado.workspace_id}</code></span>
                   </div>
                 </header>
+
+                {entornosCentro && entornosCentro.length > 0 && !activosLakehouse && !cargandoActivos && (
+                  <section className="mb-8">
+                    <button onClick={() => {
+                        let selectedEnv = entornosCentro.find((e: any) => e.capa === 'Gold');
+                        if (!selectedEnv) selectedEnv = entornosCentro.find((e: any) => e.capa === 'Silver');
+                        if (!selectedEnv) selectedEnv = entornosCentro.find((e: any) => e.capa === 'Bronze');
+                        if (!selectedEnv) selectedEnv = entornosCentro[0];
+                        if (selectedEnv) {
+                          explorarLakehouse(selectedEnv.lakehouse_id);
+                        }
+                    }} className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-md text-sm font-semibold transition-colors shadow-sm">
+                      Ver Entornos
+                    </button>
+                  </section>
+                )}
+
                 <section className="grid grid-cols-1 gap-6 mb-10 bg-gray-50 p-6 rounded-lg border border-gray-100 text-wrap">
                   <div><h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Resumen Temático</h3><p className="font-medium text-gray-900">{detalleSeleccionado.tema || "No especificado"}</p></div>
                 </section>
@@ -477,32 +505,31 @@ export default function ChileMap() {
               </article>
             </div>
 
-            {entornosCentro && (
-              <div className={`h-full overflow-y-auto transition-all duration-500 ease-in-out border-r border-gray-200 ${activosLakehouse ? 'w-1/3 bg-white p-6' : 'w-1/2 bg-gray-50 p-8 md:p-12'}`}>
-                <div className={`flex items-center justify-between mb-6 pb-4 border-b border-gray-200 ${activosLakehouse ? 'mt-4' : ''}`}>
-                  <h2 className={`${activosLakehouse ? 'text-lg' : 'text-2xl'} font-bold text-gray-900 transition-all`}>Entornos</h2>
-                  {!activosLakehouse && <button onClick={() => setEntornosCentro(null)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>}
-                </div>
-                <div className="flex flex-col gap-4">
-                  {entornosCentro.map((entorno, idx) => {
-                    const isSelected = idLakehouseActual === entorno.lakehouse_id;
-                    return (
-                      <div key={idx} onClick={() => explorarLakehouse(entorno.lakehouse_id)} className={`p-5 rounded-lg border transition-all cursor-pointer ${isSelected ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200 shadow-md scale-[1.02]' : 'border-gray-200 bg-white shadow-sm hover:shadow-md hover:border-gray-300'}`}>
-                        <div className="flex justify-between items-start mb-3">
-                          <span className={`px-2.5 py-1 rounded text-[10px] sm:text-xs font-bold uppercase tracking-wide ${entorno.capa === 'Bronze' ? 'bg-amber-100 text-amber-800 border border-amber-200' : entorno.capa === 'Silver' ? 'bg-slate-100 text-slate-700 border border-slate-300' : entorno.capa === 'Gold' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' : 'bg-gray-100 text-gray-800'}`}>{entorno.capa}</span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-semibold ${entorno.ambiente === 'PROD' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>{entorno.ambiente}</span>
-                        </div>
-                        <h4 className={`font-mono text-xs sm:text-sm font-semibold mb-1 break-all ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>{entorno.lakehouse_id}</h4>
-                        <p className={`text-xs flex items-center gap-2 ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}><span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-blue-600' : 'bg-gray-400'}`}></span>{entorno.tipo}</p>
+            {(activosLakehouse || cargandoActivos) && (
+              <div className="w-1/2 h-full overflow-y-auto bg-gray-50 p-8 md:p-12 relative animate-in slide-in-from-right-8 fade-in duration-500">
+                
+                {entornosCentro && entornosCentro.length > 0 && (
+                  <section className="mb-8 bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Entorno Seleccionado (Capa)</h3>
+                    <div className="relative">
+                      <select
+                        className="w-full appearance-none bg-gray-50 border border-gray-300 text-gray-900 py-3 px-4 pr-10 rounded-lg leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-semibold cursor-pointer transition-colors"
+                        value={idLakehouseActual || ""}
+                        onChange={(e) => explorarLakehouse(e.target.value)}
+                      >
+                        {entornosCentro.map((entorno: any) => (
+                          <option key={entorno.lakehouse_id} value={entorno.lakehouse_id}>
+                            {entorno.capa} — {entorno.ambiente} ({entorno.tipo})
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                        <svg className="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+                    </div>
+                  </section>
+                )}
 
-            {activosLakehouse && (
-              <div className="w-2/3 h-full overflow-y-auto bg-gray-50 p-8 md:p-12 relative animate-in slide-in-from-right-8 fade-in duration-500">
                 {tablaActiva ? (
                   <div className="animate-in fade-in zoom-in-95 duration-300">
                     <button onClick={() => setTablaActiva(null)} className="mb-6 flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">← Volver a la lista de tablas</button>

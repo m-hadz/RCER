@@ -1,6 +1,7 @@
 "use server";
 
 import prisma from "@/lib/db";
+import { revalidatePath } from "next/cache";
 
 export async function getMarcadores() {
     return await prisma.estacion.findMany({
@@ -92,4 +93,73 @@ export async function getDetalleTabla(lakehouse_id: string, nombre_tabla: string
     }));
 
     return { campos, linaje };
+}
+
+async function upsertColumnas(tx: any, columnas: any[], nombre_tabla: string, lakehouse_id: string) {
+    if (!columnas || !Array.isArray(columnas)) return;
+    for (const col of columnas) {
+        await tx.columna.upsert({
+            where: { nombre_tabla_lakehouse_id_nombre_columna: { nombre_tabla, lakehouse_id, nombre_columna: col.nombre_columna } },
+            update: { tipo_dato: col.tipo_dato, es_nullable: col.es_nullable, es_temporal: col.es_temporal },
+            create: { nombre_tabla, lakehouse_id, nombre_columna: col.nombre_columna, tipo_dato: col.tipo_dato, es_nullable: col.es_nullable, es_temporal: col.es_temporal }
+        });
+    }
+}
+
+async function upsertTablas(tx: any, tablas: any[], lakehouse_id: string) {
+    if (!tablas || !Array.isArray(tablas)) return;
+    for (const tabla of tablas) {
+        await tx.tabla.upsert({
+            where: { nombre_tabla_lakehouse_id: { nombre_tabla: tabla.nombre_tabla, lakehouse_id } },
+            update: { total_registros: tabla.total_registros, fecha_inicio: tabla.fecha_inicio ? new Date(tabla.fecha_inicio) : null, fecha_fin: tabla.fecha_fin ? new Date(tabla.fecha_fin) : null, col_temporal: tabla.col_temporal },
+            create: { nombre_tabla: tabla.nombre_tabla, lakehouse_id, total_registros: tabla.total_registros, fecha_inicio: tabla.fecha_inicio ? new Date(tabla.fecha_inicio) : null, fecha_fin: tabla.fecha_fin ? new Date(tabla.fecha_fin) : null, col_temporal: tabla.col_temporal }
+        });
+        await upsertColumnas(tx, tabla.columnas, tabla.nombre_tabla, lakehouse_id);
+    }
+}
+
+async function upsertLakehouses(tx: any, lakehouses: any[], workspace_id: string) {
+    if (!lakehouses || !Array.isArray(lakehouses)) return;
+    for (const lh of lakehouses) {
+        await tx.lakehouse.upsert({
+            where: { lakehouse_id: lh.lakehouse_id },
+            update: { capa: lh.capa, tipo: lh.tipo, ambiente: lh.ambiente },
+            create: { lakehouse_id: lh.lakehouse_id, workspace_id, capa: lh.capa, tipo: lh.tipo, ambiente: lh.ambiente }
+        });
+        await upsertTablas(tx, lh.tablas, lh.lakehouse_id);
+    }
+}
+
+export async function ingerirPlantillaJson(plantilla: any) {
+    try {
+        await prisma.$transaction(async (tx) => {
+            if (plantilla.workspace_id && !plantilla.lakehouse_id) {
+                await tx.estacion.upsert({
+                    where: { workspace_id: plantilla.workspace_id },
+                    update: { nombre: plantilla.nombre, workspace_nombre: plantilla.workspace_nombre, tema: plantilla.tema, descripcion: plantilla.descripcion, ambiente: plantilla.ambiente, latitud: plantilla.latitud, longitud: plantilla.longitud },
+                    create: { workspace_id: plantilla.workspace_id, nombre: plantilla.nombre, workspace_nombre: plantilla.workspace_nombre, tema: plantilla.tema, descripcion: plantilla.descripcion, ambiente: plantilla.ambiente, latitud: plantilla.latitud, longitud: plantilla.longitud }
+                });
+                await upsertLakehouses(tx, plantilla.lakehouses, plantilla.workspace_id);
+            }
+            else if (plantilla.lakehouse_id && plantilla.workspace_id) {
+                await upsertLakehouses(tx, [plantilla], plantilla.workspace_id);
+            }
+            else if (plantilla.nombre_tabla && plantilla.lakehouse_id) {
+                await upsertTablas(tx, [plantilla], plantilla.lakehouse_id);
+            }
+            else if (plantilla.nombre_columna && plantilla.nombre_tabla && plantilla.lakehouse_id) {
+                await upsertColumnas(tx, [plantilla], plantilla.nombre_tabla, plantilla.lakehouse_id);
+            }
+            else {
+                throw new Error("Estructura JSON no reconocida.");
+            }
+        });
+
+        revalidatePath("/");
+        return { success: true };
+
+    } catch (error) {
+        console.error("Error en la ingesta transaccional:", error);
+        return { success: false, error: "Falló la inserción. Verifica la consola y asegúrate de que el ID padre exista." };
+    }
 }
