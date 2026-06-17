@@ -9,9 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@duckdb/duckdb-wasm": "^1.33.1-dev45.0",
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "@turf/turf": "^7.3.5",
     "apache-arrow": "^21.1.0",
+    "better-sqlite3": "^12.11.1",
     "maplibre-gl": "^5.24.0",
     "next": "16.2.7",
     "react": "19.2.4",
@@ -20,12 +22,15 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
+    "prisma": "^7.8.0",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

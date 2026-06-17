@@ -5,26 +5,22 @@ import Map, { NavigationControl, Source, Layer, MapLayerMouseEvent, MapRef, Popu
 import * as turf from "@turf/turf";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-import { useDuckDb } from "../hooks/useDuckDb";
+import {
+  getMarcadores,
+  getDetalleEstacion,
+  getLakehouses,
+  getTablas,
+  getDetalleTabla
+} from "@/lib/actions";
 
 const DEFAULT_MAP_STYLE_URL = `https://api.maptiler.com/maps/019e8e0d-6eac-7277-94ee-b39ae7dc292d/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
 const OUTDOOR_MAP_STYLE_URL = `https://api.maptiler.com/maps/outdoor-v4/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
 
-const QUERY_MARCADORES = `
-  SELECT
-    workspace_id,
-    nombre,
-    workspace_nombre,
-    latitud,
-    longitud
-  FROM Estacion
-  WHERE latitud IS NOT NULL AND longitud IS NOT NULL;
-`;
-
 const formatearFecha = (valor: any) => {
   if (!valor) return "?";
-  if (!isNaN(Number(valor))) {
-    return new Date(Number(valor)).toLocaleDateString('es-CL');
+  const dateObj = new Date(valor);
+  if (!isNaN(dateObj.getTime())) {
+    return dateObj.toLocaleDateString('es-CL');
   }
   return String(valor);
 };
@@ -58,11 +54,6 @@ export default function ChileMap() {
   const [defaultStyle, setDefaultStyle] = React.useState<any>(DEFAULT_MAP_STYLE_URL);
   const [outdoorStyle, setOutdoorStyle] = React.useState<any>(OUTDOOR_MAP_STYLE_URL);
 
-  React.useEffect(() => {
-    fetch(DEFAULT_MAP_STYLE_URL).then(r => r.json()).then(setDefaultStyle).catch(e => console.error(e));
-    fetch(OUTDOOR_MAP_STYLE_URL).then(r => r.json()).then(setOutdoorStyle).catch(e => console.error(e));
-  }, []);
-
   const [detalleSeleccionado, setDetalleSeleccionado] = React.useState<any | null>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = React.useState<string | null>(null);
   const [idCentroActual, setIdCentroActual] = React.useState<string | null>(null);
@@ -77,23 +68,26 @@ export default function ChileMap() {
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [searchMinimized, setSearchMinimized] = React.useState<boolean>(false);
 
-  const { duckDb, loading, error } = useDuckDb();
+  const [loadingMapData, setLoadingMapData] = React.useState<boolean>(true);
 
   React.useEffect(() => {
-    if (!duckDb) return;
+    fetch(DEFAULT_MAP_STYLE_URL).then(r => r.json()).then(setDefaultStyle).catch(e => console.error(e));
+    fetch(OUTDOOR_MAP_STYLE_URL).then(r => r.json()).then(setOutdoorStyle).catch(e => console.error(e));
+    fetch("/chile_mask.geojson").then((res) => res.json()).then(setMaskData).catch(console.error);
+  }, []);
+
+  React.useEffect(() => {
     const fetchDatosMarcadores = async () => {
       try {
-        const conn = await duckDb.connect();
-        const result = await conn.query(QUERY_MARCADORES);
-        setFilas(result.toArray().map((row: any) => row.toJSON()));
-        await conn.close();
-      } catch (err) { console.error(err); }
+        const data = await getMarcadores();
+        setFilas(data);
+      } catch (err) {
+        console.error("Error cargando marcadores:", err);
+      } finally {
+        setLoadingMapData(false);
+      }
     };
     fetchDatosMarcadores();
-  }, [duckDb]);
-
-  React.useEffect(() => {
-    fetch("/chile_mask.geojson").then((res) => res.json()).then(setMaskData).catch(console.error);
   }, []);
 
   const geojsonPuntos = React.useMemo(() => {
@@ -135,16 +129,15 @@ export default function ChileMap() {
   };
 
   const seleccionarPunto = React.useCallback(async (workspace_id: string | null, targetLng: number, targetLat: number) => {
-    if (!workspace_id || !duckDb) return;
+    if (!workspace_id) return;
 
     setSelectedWorkspaceId(workspace_id);
-
     setEntornosCentro(null);
     setActivosLakehouse(null);
     setIdLakehouseActual(null);
     setTablaActiva(null);
     setDetalleTabla(null);
-    setIdCentroActual(workspace_id || null);
+    setIdCentroActual(workspace_id);
 
     const hasCoords = targetLng != null && targetLat != null && !isNaN(targetLng) && !isNaN(targetLat) && targetLng !== 0 && targetLat !== 0;
 
@@ -169,12 +162,8 @@ export default function ChileMap() {
       }
 
       setTimeout(() => {
-        try {
-          mapRefDefault.current?.getMap().resize();
-        } catch (e) { }
-        try {
-          mapRefOutdoor.current?.getMap().resize();
-        } catch (e) { }
+        try { mapRefDefault.current?.getMap().resize(); } catch (e) { }
+        try { mapRefOutdoor.current?.getMap().resize(); } catch (e) { }
         mapRefDefault.current?.flyTo(flightOptions);
       }, 50);
 
@@ -187,29 +176,10 @@ export default function ChileMap() {
     }
 
     try {
-      const conn = await duckDb.connect();
-      const queryDetalle = `
-        SELECT 
-            e.workspace_id, 
-            MAX(e.nombre) AS nombre, 
-            MAX(e.workspace_nombre) AS workspace_nombre, 
-            MAX(e.ambiente) AS ambiente, 
-            MAX(e.descripcion) AS descripcion,
-            MAX(e.tema) AS tema,
-            MIN(t.fecha_inicio) AS fecha_inicio,
-            MAX(t.fecha_fin) AS fecha_fin
-        FROM Estacion e
-        LEFT JOIN Lakehouse l ON e.workspace_id = l.workspace_id
-        LEFT JOIN Tabla t ON l.lakehouse_id = t.lakehouse_id
-        WHERE e.workspace_id = '${workspace_id}'
-        GROUP BY e.workspace_id;
-      `;
-      const result = await conn.query(queryDetalle);
-      const rows = result.toArray().map((row: any) => row.toJSON());
-      if (rows.length > 0) setDetalleSeleccionado(rows[0]);
-      await conn.close();
+      const data = await getDetalleEstacion(workspace_id);
+      if (data) setDetalleSeleccionado(data);
     } catch (err) { console.error(err); }
-  }, [duckDb, outdoorInitialState]);
+  }, [outdoorInitialState]);
 
   const onMapClick = React.useCallback(async (event: MapLayerMouseEvent) => {
     const feature = event.features?.[0];
@@ -224,108 +194,35 @@ export default function ChileMap() {
   }, [seleccionarPunto]);
 
   const explorarCentro = async () => {
-    if (!idCentroActual || !duckDb) return;
+    if (!idCentroActual) return;
     setCargandoEntornos(true);
     try {
-      const conn = await duckDb.connect();
-      const queryCentro = `
-        SELECT 
-            l.lakehouse_id, 
-            l.capa, 
-            l.tipo, 
-            l.ambiente 
-        FROM Lakehouse l 
-        WHERE l.workspace_id = '${idCentroActual}' 
-        ORDER BY 
-            CASE l.capa 
-                WHEN 'Bronze' THEN 1 
-                WHEN 'Silver' THEN 2 
-                WHEN 'Gold' THEN 3 
-                ELSE 4 
-            END;
-      `;
-      const result = await conn.query(queryCentro);
-      setEntornosCentro(result.toArray().map((row: any) => row.toJSON()));
-      await conn.close();
-    } catch (err) { console.error(err); } finally { setCargandoEntornos(false); }
+      const data = await getLakehouses(idCentroActual);
+      setEntornosCentro(data);
+    } catch (err) { console.error(err); }
+    finally { setCargandoEntornos(false); }
   };
 
   const explorarLakehouse = async (idLakehouse: string) => {
-    if (!duckDb) return;
     setIdLakehouseActual(idLakehouse);
     setTablaActiva(null);
     setCargandoActivos(true);
     try {
-      const conn = await duckDb.connect();
-      const queryActivos = `
-        SELECT 
-            nombre_tabla, 
-            total_registros, 
-            fecha_inicio, 
-            fecha_fin, 
-            col_temporal 
-        FROM Tabla 
-        WHERE lakehouse_id = '${idLakehouse}' 
-        ORDER BY total_registros DESC;
-      `;
-      const result = await conn.query(queryActivos);
-      setActivosLakehouse(result.toArray().map((row: any) => row.toJSON()));
-      await conn.close();
-    } catch (err) { console.error(err); } finally { setCargandoActivos(false); }
+      const data = await getTablas(idLakehouse);
+      setActivosLakehouse(data);
+    } catch (err) { console.error(err); }
+    finally { setCargandoActivos(false); }
   };
 
   const explorarTabla = async (activo: any) => {
-    if (!duckDb || !idLakehouseActual) return;
-
+    if (!idLakehouseActual) return;
     setTablaActiva(activo);
     setCargandoDetalleTabla(true);
-
-    let conn;
     try {
-      conn = await duckDb.connect();
-
-      const qCampos = `
-        SELECT 
-            nombre_columna, 
-            tipo_dato, 
-            es_nullable, 
-            es_temporal 
-        FROM Columnas 
-        WHERE lakehouse_id = '${idLakehouseActual}' 
-          AND nombre_tabla = '${activo.nombre_tabla}' 
-        ORDER BY es_temporal DESC, nombre_columna ASC;
-      `;
-
-      const qLinaje = `
-        SELECT 
-            t.lakehouse_id, 
-            l.capa, 
-            l.ambiente, 
-            t.total_registros 
-        FROM Tabla t 
-        JOIN Lakehouse l ON t.lakehouse_id = l.lakehouse_id 
-        WHERE t.nombre_tabla = '${activo.nombre_tabla}' 
-          AND t.lakehouse_id != '${idLakehouseActual}';
-      `;
-
-      const [resCampos, resLinaje] = await Promise.all([
-        conn.query(qCampos),
-        conn.query(qLinaje),
-      ]);
-
-      setDetalleTabla({
-        campos: resCampos.toArray().map((r: any) => r.toJSON()),
-        linaje: resLinaje.toArray().map((r: any) => r.toJSON())
-      });
-
-    } catch (err) {
-      console.error("Error profundizando en tabla:", err);
-    } finally {
-      setCargandoDetalleTabla(false);
-      if (conn) {
-        await conn.close();
-      }
-    }
+      const data = await getDetalleTabla(idLakehouseActual, activo.nombre_tabla);
+      setDetalleTabla(data);
+    } catch (err) { console.error("Error profundizando en tabla:", err); }
+    finally { setCargandoDetalleTabla(false); }
   };
 
   const cerrarDetalle = () => {
@@ -429,7 +326,7 @@ export default function ChileMap() {
   return (
     <div className="relative w-full h-full overflow-hidden bg-white">
 
-      {loading && <div className="absolute z-50 top-10 left-10 bg-white px-4 py-2 text-black rounded-md shadow-md border border-gray-100">Iniciando catálogo...</div>}
+      {loadingMapData && <div className="absolute z-50 top-10 left-10 bg-white px-4 py-2 text-black rounded-md shadow-md border border-gray-100">Iniciando catálogo...</div>}
 
       {/* CONTENEDOR IZQUIERDO */}
       <div className={`absolute left-0 top-0 h-full z-10 flex flex-col bg-white ${selectedWorkspaceId ? "w-1/3 border-r border-gray-200" : "w-full"}`}>
