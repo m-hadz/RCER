@@ -1,0 +1,47 @@
+{
+    "workspace_id": "ws_glaciar",
+    "nombre": "Estación Glaciar",
+    "workspace_nombre": "Workspace Dev - Glaciar",
+    "tema": "Ambiente Glaciar",
+    "descripcion": "Estación de monitoreo de glaciares en la Patagonia Chilena, monitoreando el derretimiento de glaciares",
+    "ambiente": "DEV",
+    "latitud": -49.5736597,
+    "longitud": -73.0609634,
+    "lakehouses": [
+        {
+            "lakehouse_id": "lh_glaciar_gold",
+            "capa": "Gold",
+            "tipo": "Lakehouse",
+            "ambiente": "PROD",
+            "tablas": [
+                {
+                    "nombre_tabla": "sensores_temperatura",
+                    "total_registros": 3,
+                    "fecha_inicio": "2026-06-17T00:00:00",
+                    "fecha_fin": "2026-06-17T23:00:00",
+                    "col_temporal": "fecha_medicion",
+                    "columnas": [
+                        {
+                            "nombre_columna": "fecha_medicion",
+                            "tipo_dato": "timestamp",
+                            "es_nullable": false,
+                            "es_temporal": true
+                        },
+                        {
+                            "nombre_columna": "valor_celcius",
+                            "tipo_dato": "double",
+                            "es_nullable": true,
+                            "es_temporal": false
+                        },
+                        {
+                            "nombre_columna": "sensor_id",
+                            "tipo_dato": "int",
+                            "es_nullable": true,
+                            "es_temporal": false
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

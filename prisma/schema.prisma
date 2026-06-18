@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Estacion {
+  workspace_id     String  @id
+  nombre           String
+  workspace_nombre String
+  tema             String?
+  descripcion      String?
+  ambiente         String?
+  latitud          Float?
+  longitud         Float?
+
+  lakehouses Lakehouse[]
+}
+
+model Lakehouse {
+  lakehouse_id String  @id
+  workspace_id String
+  capa         String
+  tipo         String?
+  ambiente     String?
+
+  estacion Estacion @relation(fields: [workspace_id], references: [workspace_id])
+  tablas   Tabla[]
+
+  @@index([workspace_id])
+}
+
+model Tabla {
+  nombre_tabla    String
+  lakehouse_id    String
+  total_registros Int?
+  fecha_inicio    DateTime?
+  fecha_fin       DateTime?
+  col_temporal    String?
+
+  lakehouse Lakehouse @relation(fields: [lakehouse_id], references: [lakehouse_id])
+  columnas  Columna[]
+
+  @@id([nombre_tabla, lakehouse_id])
+  @@index([lakehouse_id])
+}
+
+model Columna {
+  nombre_tabla   String
+  lakehouse_id   String
+  nombre_columna String
+  tipo_dato      String
+  es_nullable    Boolean
+  es_temporal    Boolean?
+
+  tabla Tabla @relation(fields: [nombre_tabla, lakehouse_id], references: [nombre_tabla, lakehouse_id])
+
+  @@id([nombre_tabla, lakehouse_id, nombre_columna])
+  @@index([nombre_tabla, lakehouse_id])
+}
