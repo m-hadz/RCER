@@ -466,7 +466,7 @@ export default function ChileMap() {
           </div>
         ) : (
           <>
-            <div className={`h-full overflow-y-auto transition-all duration-500 ease-in-out border-r border-gray-200 ${(activosLakehouse || cargandoActivos) ? 'w-1/2 p-8 md:p-12' : 'w-full p-8 md:p-12'}`}>
+            <div className={`h-full overflow-y-auto transition-all duration-500 ease-in-out border-r border-gray-200 w-1/2 p-8 md:p-12`}>
               <article className="max-w-3xl mx-auto min-w-[400px]">
                 <header className="mb-8 border-b border-gray-200 pb-8 text-wrap">
                   <div className="flex flex-col 2xl:flex-row 2xl:items-start justify-between gap-6 mb-4">
@@ -479,148 +479,133 @@ export default function ChileMap() {
                   </div>
                 </header>
 
-                {entornosCentro && entornosCentro.length > 0 && !activosLakehouse && !cargandoActivos && (
-                  <section className="mb-8">
-                    <button onClick={() => {
-                        let selectedEnv = entornosCentro.find((e: any) => e.capa === 'Gold');
-                        if (!selectedEnv) selectedEnv = entornosCentro.find((e: any) => e.capa === 'Silver');
-                        if (!selectedEnv) selectedEnv = entornosCentro.find((e: any) => e.capa === 'Bronze');
-                        if (!selectedEnv) selectedEnv = entornosCentro[0];
-                        if (selectedEnv) {
-                          explorarLakehouse(selectedEnv.lakehouse_id);
-                        }
-                    }} className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-md text-sm font-semibold transition-colors shadow-sm">
-                      Ver Entornos
-                    </button>
-                  </section>
-                )}
+                {(activosLakehouse || cargandoActivos) && (
+                  <div className="animate-in fade-in duration-500">
+                    {tablaActiva ? (
+                      <div className="animate-in fade-in zoom-in-95 duration-300">
+                        <button onClick={() => setTablaActiva(null)} className="mb-6 flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">← Volver a la lista de tablas</button>
 
-                <section className="grid grid-cols-1 gap-6 mb-10 bg-gray-50 p-6 rounded-lg border border-gray-100 text-wrap">
-                  <div><h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Resumen Temático</h3><p className="font-medium text-gray-900">{detalleSeleccionado.tema || "No especificado"}</p></div>
-                </section>
-                <section className="prose prose-gray max-w-none text-black text-wrap">
-                  <h2 className="text-2xl font-bold mb-4 text-gray-900">Descripción</h2>
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{detalleSeleccionado.descripcion || "Sin descripción disponible."}</p>
-                </section>
-              </article>
-            </div>
+                        <div className="mb-8 border-b border-gray-200 pb-6">
+                          <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Explorador de Activo</p>
+                          <h2 className="text-3xl font-bold text-gray-900 font-mono mb-3">{tablaActiva.nombre_tabla}</h2>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold">{tablaActiva.total_registros ? tablaActiva.total_registros.toLocaleString('es-CL') : 0} Registros</span>
+                        </div>
 
-            {(activosLakehouse || cargandoActivos) && (
-              <div className="w-1/2 h-full overflow-y-auto bg-gray-50 p-8 md:p-12 relative animate-in slide-in-from-right-8 fade-in duration-500">
-                
-                {entornosCentro && entornosCentro.length > 0 && (
-                  <section className="mb-8 bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Entorno Seleccionado (Capa)</h3>
-                    <div className="relative">
-                      <select
-                        className="w-full appearance-none bg-gray-50 border border-gray-300 text-gray-900 py-3 px-4 pr-10 rounded-lg leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-semibold cursor-pointer transition-colors"
-                        value={idLakehouseActual || ""}
-                        onChange={(e) => explorarLakehouse(e.target.value)}
-                      >
-                        {entornosCentro.map((entorno: any) => (
-                          <option key={entorno.lakehouse_id} value={entorno.lakehouse_id}>
-                            {entorno.capa} — {entorno.ambiente} ({entorno.tipo})
-                          </option>
-                        ))}
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                        <svg className="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                      </div>
-                    </div>
-                  </section>
-                )}
+                        {cargandoDetalleTabla ? (
+                          <p className="text-gray-500 animate-pulse mt-10 text-center">Analizando Grafo de Conocimiento...</p>
+                        ) : (
+                          <div className="space-y-10">
+                            <section>
+                              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">1. Esquema Estructural <span className="text-xs font-normal text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{detalleTabla?.campos?.length || 0} Columnas</span></h3>
+                              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                                <table className="w-full text-left text-sm">
+                                  <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
+                                    <tr><th className="px-4 py-3 font-semibold">Columna</th><th className="px-4 py-3 font-semibold">Tipo</th><th className="px-4 py-3 font-semibold">Nullable</th><th className="px-4 py-3 font-semibold text-center">Es Temporal</th></tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100">
+                                    {detalleTabla?.campos?.map((c, i) => (
+                                      <tr key={i} className="hover:bg-gray-50">
+                                        <td className="px-4 py-2.5 font-mono text-gray-900">{c.nombre_columna}</td>
+                                        <td className="px-4 py-2.5 text-blue-600 font-mono text-xs">{c.tipo_dato}</td>
+                                        <td className="px-4 py-2.5 text-gray-600">{parseBoolean(c.es_nullable) ? 'Sí' : 'No'}</td>
+                                        <td className="px-4 py-2.5 text-center">{parseBoolean(c.es_temporal) ? <span className="text-orange-500">⏱️</span> : <span className="text-gray-300">-</span>}</td>
+                                      </tr>
+                                    ))}
+                                    {detalleTabla?.campos?.length === 0 && (<tr><td colSpan={4} className="px-4 py-6 text-center text-gray-500 italic">No hay campos estructurales registrados en el catálogo.</td></tr>)}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </section>
 
-                {tablaActiva ? (
-                  <div className="animate-in fade-in zoom-in-95 duration-300">
-                    <button onClick={() => setTablaActiva(null)} className="mb-6 flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">← Volver a la lista de tablas</button>
-
-                    <div className="mb-8 border-b border-gray-200 pb-6">
-                      <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Explorador de Activo</p>
-                      <h2 className="text-3xl font-bold text-gray-900 font-mono mb-3">{tablaActiva.nombre_tabla}</h2>
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold">{tablaActiva.total_registros ? tablaActiva.total_registros.toLocaleString('es-CL') : 0} Registros</span>
-                    </div>
-
-                    {cargandoDetalleTabla ? (
-                      <p className="text-gray-500 animate-pulse mt-10 text-center">Analizando Grafo de Conocimiento...</p>
-                    ) : (
-                      <div className="space-y-10">
-                        <section>
-                          <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">1. Esquema Estructural <span className="text-xs font-normal text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{detalleTabla?.campos?.length || 0} Columnas</span></h3>
-                          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-                            <table className="w-full text-left text-sm">
-                              <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
-                                <tr><th className="px-4 py-3 font-semibold">Columna</th><th className="px-4 py-3 font-semibold">Tipo</th><th className="px-4 py-3 font-semibold">Nullable</th><th className="px-4 py-3 font-semibold text-center">Es Temporal</th></tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-100">
-                                {detalleTabla?.campos?.map((c, i) => (
-                                  <tr key={i} className="hover:bg-gray-50">
-                                    <td className="px-4 py-2.5 font-mono text-gray-900">{c.nombre_columna}</td>
-                                    <td className="px-4 py-2.5 text-blue-600 font-mono text-xs">{c.tipo_dato}</td>
-                                    <td className="px-4 py-2.5 text-gray-600">{parseBoolean(c.es_nullable) ? 'Sí' : 'No'}</td>
-                                    <td className="px-4 py-2.5 text-center">{parseBoolean(c.es_temporal) ? <span className="text-orange-500">⏱️</span> : <span className="text-gray-300">-</span>}</td>
-                                  </tr>
-                                ))}
-                                {detalleTabla?.campos?.length === 0 && (<tr><td colSpan={4} className="px-4 py-6 text-center text-gray-500 italic">No hay campos estructurales registrados en el catálogo.</td></tr>)}
-                              </tbody>
-                            </table>
+                            <section>
+                              <h3 className="text-xl font-bold text-gray-900 mb-4">2. Linaje y Disponibilidad</h3>
+                              {detalleTabla?.linaje?.length === 0 ? (
+                                <p className="text-gray-500 italic text-sm">Esta tabla solo existe en el entorno actual.</p>
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {detalleTabla?.linaje?.map((l, i) => (
+                                    <div key={i} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm relative overflow-hidden">
+                                      <div className={`absolute top-0 right-0 bottom-0 w-1 ${l.capa === 'Bronze' ? 'bg-amber-400' : l.capa === 'Silver' ? 'bg-slate-400' : 'bg-yellow-400'}`}></div>
+                                      <p className="text-xs font-bold text-gray-500 mb-1">TAMBIÉN EXISTE EN</p>
+                                      <h4 className="font-mono text-sm font-bold text-gray-900 mb-2">{l.lakehouse_id}</h4>
+                                      <div className="flex flex-wrap gap-2 text-xs">
+                                        <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded">Capa {l.capa}</span><span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{l.ambiente}</span><span className="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded font-semibold">{l.total_registros?.toLocaleString('es-CL')} Regs.</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </section>
                           </div>
-                        </section>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="animate-in fade-in duration-300">
+                        <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200">
+                          <div><p className="text-sm font-bold text-blue-600 mb-1 uppercase tracking-wider">Activos Físicos</p><h2 className="text-2xl md:text-3xl font-bold text-gray-900 font-mono">{idLakehouseActual}</h2></div>
+                        </div>
 
-                        <section>
-                          <h3 className="text-xl font-bold text-gray-900 mb-4">2. Linaje y Disponibilidad</h3>
-                          {detalleTabla?.linaje?.length === 0 ? (
-                            <p className="text-gray-500 italic text-sm">Esta tabla solo existe en el entorno actual.</p>
-                          ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {detalleTabla?.linaje?.map((l, i) => (
-                                <div key={i} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm relative overflow-hidden">
-                                  <div className={`absolute top-0 right-0 bottom-0 w-1 ${l.capa === 'Bronze' ? 'bg-amber-400' : l.capa === 'Silver' ? 'bg-slate-400' : 'bg-yellow-400'}`}></div>
-                                  <p className="text-xs font-bold text-gray-500 mb-1">TAMBIÉN EXISTE EN</p>
-                                  <h4 className="font-mono text-sm font-bold text-gray-900 mb-2">{l.lakehouse_id}</h4>
-                                  <div className="flex flex-wrap gap-2 text-xs">
-                                    <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded">Capa {l.capa}</span><span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{l.ambiente}</span><span className="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded font-semibold">{l.total_registros?.toLocaleString('es-CL')} Regs.</span>
+                        {cargandoActivos ? (
+                          <p className="text-gray-500 animate-pulse">Consultando el catálogo interno...</p>
+                        ) : (
+                          <div className="flex flex-col gap-4">
+                            {activosLakehouse?.length === 0 ? (
+                              <div className="text-center py-12 bg-white rounded-lg border border-gray-200 border-dashed"><p className="text-gray-500 italic">No hay tablas registradas en este contenedor.</p></div>
+                            ) : (
+                              activosLakehouse?.map((activo, idx) => (
+                                <div key={idx} onClick={() => explorarTabla(activo)} className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group">
+                                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4">
+                                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 group-hover:text-blue-600 transition-colors"><svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>{activo.nombre_tabla}</h3>
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-semibold border border-blue-100"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>{activo.total_registros ? activo.total_registros.toLocaleString('es-CL') : 0} Registros</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-gray-50 p-4 rounded-md border border-gray-100">
+                                    <div><span className="block text-gray-500 font-semibold mb-1 text-xs uppercase">Cobertura Temporal</span><span className="text-gray-900 font-medium">{formatearFecha(activo.fecha_inicio)} → {formatearFecha(activo.fecha_fin)}</span></div>
+                                    <div><span className="block text-gray-500 font-semibold mb-1 text-xs uppercase">Columna de Partición/Tiempo</span><code className="text-gray-800 bg-white border border-gray-200 px-2 py-0.5 rounded">{activo.col_temporal || "N/A"}</code></div>
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          )}
-                        </section>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="animate-in fade-in duration-300">
-                    <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200">
-                      <div><p className="text-sm font-bold text-blue-600 mb-1 uppercase tracking-wider">Activos Físicos</p><h2 className="text-2xl md:text-3xl font-bold text-gray-900 font-mono">{idLakehouseActual}</h2></div>
-                      <button onClick={() => { setActivosLakehouse(null); setIdLakehouseActual(null); }} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
-                    </div>
-
-                    {cargandoActivos ? (
-                      <p className="text-gray-500 animate-pulse">Consultando el catálogo interno...</p>
-                    ) : (
-                      <div className="flex flex-col gap-4">
-                        {activosLakehouse?.length === 0 ? (
-                          <div className="text-center py-12 bg-white rounded-lg border border-gray-200 border-dashed"><p className="text-gray-500 italic">No hay tablas registradas en este contenedor.</p></div>
-                        ) : (
-                          activosLakehouse?.map((activo, idx) => (
-                            <div key={idx} onClick={() => explorarTabla(activo)} className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group">
-                              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4">
-                                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 group-hover:text-blue-600 transition-colors"><svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>{activo.nombre_tabla}</h3>
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-semibold border border-blue-100"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>{activo.total_registros ? activo.total_registros.toLocaleString('es-CL') : 0} Registros</span>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-gray-50 p-4 rounded-md border border-gray-100">
-                                <div><span className="block text-gray-500 font-semibold mb-1 text-xs uppercase">Cobertura Temporal</span><span className="text-gray-900 font-medium">{formatearFecha(activo.fecha_inicio)} → {formatearFecha(activo.fecha_fin)}</span></div>
-                                <div><span className="block text-gray-500 font-semibold mb-1 text-xs uppercase">Columna de Partición/Tiempo</span><code className="text-gray-800 bg-white border border-gray-200 px-2 py-0.5 rounded">{activo.col_temporal || "N/A"}</code></div>
-                              </div>
-                            </div>
-                          ))
+                              ))
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
                   </div>
                 )}
-              </div>
-            )}
+              </article>
+            </div>
+
+            <div className="w-1/2 h-full overflow-y-auto bg-gray-50 p-8 md:p-12 relative animate-in slide-in-from-right-8 fade-in duration-500">
+              {entornosCentro && entornosCentro.length > 0 && (
+                <section className="mb-8 bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Entorno Seleccionado (Capa)</h3>
+                  <div className="relative">
+                    <select
+                      className="w-full appearance-none bg-gray-50 border border-gray-300 text-gray-900 py-3 px-4 pr-10 rounded-lg leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-semibold cursor-pointer transition-colors"
+                      value={idLakehouseActual || ""}
+                      onChange={(e) => explorarLakehouse(e.target.value)}
+                    >
+                      {entornosCentro.map((entorno: any) => (
+                        <option key={entorno.lakehouse_id} value={entorno.lakehouse_id}>
+                          {entorno.capa} — {entorno.ambiente} ({entorno.tipo})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                      <svg className="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              <section className="grid grid-cols-1 gap-6 mb-8 bg-white p-6 rounded-lg border border-gray-200 shadow-sm text-wrap">
+                <div><h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Resumen Temático</h3><p className="font-medium text-gray-900">{detalleSeleccionado.tema || "No especificado"}</p></div>
+              </section>
+              
+              <section className="prose prose-gray max-w-none text-black text-wrap bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                <h2 className="text-2xl font-bold mb-4 text-gray-900">Descripción</h2>
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{detalleSeleccionado.descripcion || "Sin descripción disponible."}</p>
+              </section>
+            </div>
           </>
         )}
       </div>
