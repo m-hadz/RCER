@@ -114,8 +114,26 @@ async function upsertLakehouses(tx: any, lakehouses: any[], workspace_id: string
     }
 }
 
-export async function ingerirPlantillaJson(plantilla: any) {
+export async function ingerirPlantillaJson(plantilla: any, expectedWorkspaceId?: string) {
     try {
+        if (expectedWorkspaceId) {
+            if (plantilla.workspace_id) {
+                if (plantilla.workspace_id !== expectedWorkspaceId) {
+                    return { success: false, error: "El JSON no corresponde a la estación actual." };
+                }
+            } else if (plantilla.lakehouse_id) {
+                const lakehouse = await prisma.lakehouse.findUnique({
+                    where: { lakehouse_id: plantilla.lakehouse_id }
+                });
+                if (!lakehouse) {
+                    return { success: false, error: "El lakehouse especificado en el JSON no existe." };
+                }
+                if (lakehouse.workspace_id !== expectedWorkspaceId) {
+                    return { success: false, error: "El lakehouse del JSON no pertenece a la estación actual." };
+                }
+            }
+        }
+
         await prisma.$transaction(async (tx) => {
             if (plantilla.workspace_id && !plantilla.lakehouse_id) {
                 await tx.estacion.upsert({
