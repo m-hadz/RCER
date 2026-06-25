@@ -76,23 +76,7 @@ export async function getDetalleTabla(lakehouse_id: string, nombre_tabla: string
             { nombre_columna: 'asc' }
         ]
     });
-
-    const linajeRaw = await prisma.tabla.findMany({
-        where: {
-            nombre_tabla,
-            lakehouse_id: { not: lakehouse_id }
-        },
-        include: { lakehouse: true }
-    });
-
-    const linaje = linajeRaw.map(t => ({
-        lakehouse_id: t.lakehouse_id,
-        capa: t.lakehouse?.capa,
-        ambiente: t.lakehouse?.ambiente,
-        total_registros: t.total_registros
-    }));
-
-    return { campos, linaje };
+    return { campos };
 }
 
 async function upsertColumnas(tx: any, columnas: any[], nombre_tabla: string, lakehouse_id: string) {

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Map, { NavigationControl, Source, Layer, MapLayerMouseEvent, MapRef, Popup } from "react-map-gl/maplibre";
+import ChartBuilder from "@/components/ChartBuilder";
 import * as turf from "@turf/turf";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -10,7 +11,8 @@ import {
   getDetalleEstacion,
   getLakehouses,
   getTablas,
-  getDetalleTabla
+  getDetalleTabla,
+  ingerirPlantillaJson // <-- Importación agregada
 } from "@/lib/actions";
 
 const DEFAULT_MAP_STYLE_URL = `https://api.maptiler.com/maps/019e8e0d-6eac-7277-94ee-b39ae7dc292d/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`;
@@ -63,12 +65,16 @@ export default function ChileMap() {
   const [idLakehouseActual, setIdLakehouseActual] = React.useState<string | null>(null);
   const [cargandoActivos, setCargandoActivos] = React.useState<boolean>(false);
   const [tablaActiva, setTablaActiva] = React.useState<any | null>(null);
-  const [detalleTabla, setDetalleTabla] = React.useState<{ campos: any[], linaje: any[] } | null>(null);
+  const [detalleTabla, setDetalleTabla] = React.useState<{ campos: any[] } | null>(null);
   const [cargandoDetalleTabla, setCargandoDetalleTabla] = React.useState<boolean>(false);
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [searchMinimized, setSearchMinimized] = React.useState<boolean>(false);
 
   const [loadingMapData, setLoadingMapData] = React.useState<boolean>(true);
+
+  // ESTADOS PARA LA INGESTA DE JSON
+  const [estadoIngesta, setEstadoIngesta] = React.useState<"idle" | "cargando" | "exito" | "error">("idle");
+  const [mensajeIngesta, setMensajeIngesta] = React.useState("");
 
   React.useEffect(() => {
     fetch(DEFAULT_MAP_STYLE_URL).then(r => r.json()).then(setDefaultStyle).catch(e => console.error(e));
@@ -138,6 +144,10 @@ export default function ChileMap() {
     setTablaActiva(null);
     setDetalleTabla(null);
     setIdCentroActual(workspace_id);
+
+    // Limpiar estado de ingesta si se cambia de punto
+    setEstadoIngesta("idle");
+    setMensajeIngesta("");
 
     const hasCoords = targetLng != null && targetLat != null && !isNaN(targetLng) && !isNaN(targetLat) && targetLng !== 0 && targetLat !== 0;
 
@@ -277,6 +287,58 @@ export default function ChileMap() {
     }, 1200);
   };
 
+  // FUNCIÓN MANEJADORA DE SUBIDA DE JSON
+  const manejarSubidaArchivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+
+    setEstadoIngesta("cargando");
+
+    const reader = new FileReader();
+
+    reader.onload = async (evento) => {
+      try {
+        const contenido = evento.target?.result as string;
+        const jsonParseado = JSON.parse(contenido);
+
+        const respuesta = await ingerirPlantillaJson(jsonParseado);
+
+        if (respuesta.success) {
+          setEstadoIngesta("exito");
+          setMensajeIngesta("¡Datos ingresados exitosamente!");
+
+          // Opcional: Recargar los datos del punto actual para reflejar cambios
+          /*
+          if (selectedWorkspaceId && detalleSeleccionado) {
+              seleccionarPunto(selectedWorkspaceId, Number(detalleSeleccionado.longitud), Number(detalleSeleccionado.latitud));
+          }
+          */
+        } else {
+          setEstadoIngesta("error");
+          setMensajeIngesta(respuesta.error || "Error desconocido al insertar.");
+        }
+      } catch (error) {
+        setEstadoIngesta("error");
+        setMensajeIngesta("El archivo no es un JSON válido.");
+      }
+
+      // Limpiar mensaje después de unos segundos
+      setTimeout(() => {
+        setEstadoIngesta("idle");
+        setMensajeIngesta("");
+      }, 5000);
+    };
+
+    reader.onerror = () => {
+      setEstadoIngesta("error");
+      setMensajeIngesta("Error al leer el archivo físico.");
+      setTimeout(() => setEstadoIngesta("idle"), 5000);
+    };
+
+    reader.readAsText(archivo);
+    e.target.value = ""; // Limpiar el input para permitir subir el mismo archivo de nuevo si es necesario
+  };
+
   const mapLayers = (
     <>
       {hoverInfo && (
@@ -340,7 +402,12 @@ export default function ChileMap() {
   return (
     <div className="relative w-full h-full overflow-hidden bg-white">
 
-      {loadingMapData && <div className="absolute z-50 top-10 left-10 bg-white px-4 py-2 text-black rounded-md shadow-md border border-gray-100">Iniciando catálogo...</div>}
+      {loadingMapData && (
+        <div className="absolute z-50 top-10 left-10 bg-white px-4 py-3 rounded-md shadow-md border border-gray-100 flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-gray-700 text-sm font-semibold">Iniciando catálogo...</span>
+        </div>
+      )}
 
       {/* CONTENEDOR IZQUIERDO */}
       <div className={`absolute left-0 top-0 h-full z-10 flex flex-col bg-white ${selectedWorkspaceId ? "w-1/3 border-r border-gray-200" : "w-full"}`}>
@@ -492,7 +559,10 @@ export default function ChileMap() {
                         </div>
 
                         {cargandoDetalleTabla ? (
-                          <p className="text-gray-500 animate-pulse mt-10 text-center">Analizando Grafo de Conocimiento...</p>
+                          <div className="flex flex-col items-center justify-center py-12 gap-3 mt-4">
+                            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            <p className="text-gray-500 font-medium animate-pulse">Analizando Grafo de Conocimiento...</p>
+                          </div>
                         ) : (
                           <div className="space-y-10">
                             <section>
@@ -516,24 +586,19 @@ export default function ChileMap() {
                                 </table>
                               </div>
                             </section>
-
                             <section>
-                              <h3 className="text-xl font-bold text-gray-900 mb-4">2. Linaje y Disponibilidad</h3>
-                              {detalleTabla?.linaje?.length === 0 ? (
-                                <p className="text-gray-500 italic text-sm">Esta tabla solo existe en el entorno actual.</p>
-                              ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {detalleTabla?.linaje?.map((l, i) => (
-                                    <div key={i} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm relative overflow-hidden">
-                                      <div className={`absolute top-0 right-0 bottom-0 w-1 ${l.capa === 'Bronze' ? 'bg-amber-400' : l.capa === 'Silver' ? 'bg-slate-400' : 'bg-yellow-400'}`}></div>
-                                      <p className="text-xs font-bold text-gray-500 mb-1">TAMBIÉN EXISTE EN</p>
-                                      <h4 className="font-mono text-sm font-bold text-gray-900 mb-2">{l.lakehouse_id}</h4>
-                                      <div className="flex flex-wrap gap-2 text-xs">
-                                        <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded">Capa {l.capa}</span><span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{l.ambiente}</span><span className="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded font-semibold">{l.total_registros?.toLocaleString('es-CL')} Regs.</span>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
+                              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                2. Visualización
+                                <span className="text-xs font-normal text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">Nuevo</span>
+                              </h3>
+                              <p className="text-sm text-gray-600 mb-2">Configura los ejes para explorar los datos de esta tabla.</p>
+
+                              {detalleTabla?.campos && idLakehouseActual && tablaActiva && (
+                                <ChartBuilder
+                                  campos={detalleTabla.campos}
+                                  lakehouseId={idLakehouseActual}
+                                  tablaNombre={tablaActiva.nombre_tabla}
+                                />
                               )}
                             </section>
                           </div>
@@ -546,7 +611,10 @@ export default function ChileMap() {
                         </div>
 
                         {cargandoActivos ? (
-                          <p className="text-gray-500 animate-pulse">Consultando el catálogo interno...</p>
+                          <div className="flex flex-col items-center justify-center py-10 gap-3">
+                            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            <p className="text-gray-500 font-medium animate-pulse">Consultando el catálogo interno...</p>
+                          </div>
                         ) : (
                           <div className="flex flex-col gap-4">
                             {activosLakehouse?.length === 0 ? (
@@ -574,37 +642,68 @@ export default function ChileMap() {
               </article>
             </div>
 
-            <div className="w-1/2 h-full overflow-y-auto bg-gray-50 p-8 md:p-12 relative animate-in slide-in-from-right-8 fade-in duration-500">
-              {entornosCentro && entornosCentro.length > 0 && (
-                <section className="mb-8 bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Entorno Seleccionado (Capa)</h3>
-                  <div className="relative">
-                    <select
-                      className="w-full appearance-none bg-gray-50 border border-gray-300 text-gray-900 py-3 px-4 pr-10 rounded-lg leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-semibold cursor-pointer transition-colors"
-                      value={idLakehouseActual || ""}
-                      onChange={(e) => explorarLakehouse(e.target.value)}
-                    >
-                      {entornosCentro.map((entorno: any) => (
-                        <option key={entorno.lakehouse_id} value={entorno.lakehouse_id}>
-                          {entorno.capa} — {entorno.ambiente} ({entorno.tipo})
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                      <svg className="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                    </div>
-                  </div>
-                </section>
-              )}
+            <div className="w-1/2 h-full overflow-y-auto bg-gray-50 p-8 md:p-12 relative animate-in slide-in-from-right-8 fade-in duration-500 flex flex-col justify-between">
 
-              <section className="grid grid-cols-1 gap-6 mb-8 bg-white p-6 rounded-lg border border-gray-200 shadow-sm text-wrap">
-                <div><h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Resumen Temático</h3><p className="font-medium text-gray-900">{detalleSeleccionado.tema || "No especificado"}</p></div>
-              </section>
-              
-              <section className="prose prose-gray max-w-none text-black text-wrap bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-                <h2 className="text-2xl font-bold mb-4 text-gray-900">Descripción</h2>
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{detalleSeleccionado.descripcion || "Sin descripción disponible."}</p>
-              </section>
+              {/* CONTENIDO SUPERIOR DEL PANEL DERECHO */}
+              <div>
+                {entornosCentro && entornosCentro.length > 0 && (
+                  <section className="mb-8 bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Entorno Seleccionado (Capa)</h3>
+                    <div className="relative">
+                      <select
+                        className="w-full appearance-none bg-gray-50 border border-gray-300 text-gray-900 py-3 px-4 pr-10 rounded-lg leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-semibold cursor-pointer transition-colors"
+                        value={idLakehouseActual || ""}
+                        onChange={(e) => explorarLakehouse(e.target.value)}
+                      >
+                        {entornosCentro.map((entorno: any) => (
+                          <option key={entorno.lakehouse_id} value={entorno.lakehouse_id}>
+                            {entorno.capa} — {entorno.ambiente} ({entorno.tipo})
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                        <svg className="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                <section className="grid grid-cols-1 gap-6 mb-8 bg-white p-6 rounded-lg border border-gray-200 shadow-sm text-wrap">
+                  <div><h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Resumen Temático</h3><p className="font-medium text-gray-900">{detalleSeleccionado.tema || "No especificado"}</p></div>
+                </section>
+
+                <section className="prose prose-gray max-w-none text-black text-wrap bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                  <h2 className="text-2xl font-bold mb-4 text-gray-900">Descripción</h2>
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{detalleSeleccionado.descripcion || "Sin descripción disponible."}</p>
+                </section>
+              </div>
+
+              {/* CONTENEDOR INFERIOR: BOTÓN DE CARGA DE DATOS */}
+              <div className="mt-12 flex flex-col items-end">
+                {estadoIngesta !== "idle" && estadoIngesta !== "cargando" && (
+                  <div className={`mb-3 text-sm font-medium px-4 py-2 rounded-lg shadow-sm border ${estadoIngesta === 'exito' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'} animate-in fade-in slide-in-from-bottom-2`}>
+                    {mensajeIngesta}
+                  </div>
+                )}
+
+                <label className={`relative cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold text-white transition-all shadow-sm ${estadoIngesta === 'cargando' ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md active:scale-95'}`}>
+                  {estadoIngesta === 'cargando' ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"></path></svg>
+                  )}
+                  {estadoIngesta === 'cargando' ? 'Procesando archivo...' : 'Agregar Datos (JSON)'}
+
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={manejarSubidaArchivo}
+                    disabled={estadoIngesta === "cargando"}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
             </div>
           </>
         )}
