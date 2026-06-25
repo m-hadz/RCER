@@ -23,6 +23,11 @@ export interface VisorMapasProps {
 
 import { useCatalogContext } from "@/contexts/CatalogContext";
 
+const CHILE_MAX_BOUNDS: [[number, number], [number, number]] = [
+  [-110, -60],
+  [-30, -18]
+];
+
 export default function VisorMapas({
   mapRefDefault,
   mapRefOutdoor,
@@ -134,6 +139,7 @@ export default function VisorMapas({
             style={{ width: "100%", height: "100%" }}
             mapStyle={outdoorStyle}
             minZoom={4} maxZoom={10}
+            maxBounds={CHILE_MAX_BOUNDS}
             interactiveLayerIds={["marcadores-layer"]}
             onClick={onMapClick}
             cursor={cursor}
@@ -159,6 +165,7 @@ export default function VisorMapas({
           style={{ width: "100%", height: "100%" }}
           mapStyle={defaultStyle}
           minZoom={4} maxZoom={10}
+          maxBounds={CHILE_MAX_BOUNDS}
           interactiveLayerIds={["marcadores-layer"]}
           onClick={onMapClick}
           onLoad={() => setMapaCargado(true)}
