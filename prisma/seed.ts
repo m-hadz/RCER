@@ -97,6 +97,26 @@ async function main() {
     ];
 
     await prisma.columna.createMany({ data: columnas });
+    const relaciones = [
+        { estacion_origen_id: 'ws_patagonia', estacion_destino_id: 'ws_cda' },
+        { estacion_origen_id: 'ws_patagonia', estacion_destino_id: 'ws_cedel' },
+
+        { estacion_origen_id: 'ws_cda', estacion_destino_id: 'ws_torre' },
+
+        { estacion_origen_id: 'ws_atacama', estacion_destino_id: 'ws_torre' },
+        { estacion_origen_id: 'ws_atacama', estacion_destino_id: 'ws_cedel' },
+
+        { estacion_origen_id: 'ws_torre', estacion_destino_id: 'ws_atacama' },
+
+        { estacion_origen_id: 'ws_loa', estacion_destino_id: 'ws_patagonia' },
+        { estacion_origen_id: 'ws_loa', estacion_destino_id: 'ws_atacama' },
+        { estacion_origen_id: 'ws_loa', estacion_destino_id: 'ws_cedel' },
+
+        { estacion_origen_id: 'ws_cedel', estacion_destino_id: 'ws_torre' },
+        { estacion_origen_id: 'ws_cedel', estacion_destino_id: 'ws_loa' }
+    ];
+
+    await prisma.relacion.createMany({ data: relaciones });
 }
 
 main()

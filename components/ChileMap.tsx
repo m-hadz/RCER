@@ -16,7 +16,8 @@ function ChileMapOrchestrator() {
   const {
     filas, searchQuery, setSearchQuery, searchPlacesFiltered,
     detalleSeleccionado, cargarDetalleWorkspace, limpiarSeleccion,
-    loadingMapData, errorCatalog, searchMinimized, setSearchMinimized
+    loadingMapData, errorCatalog, searchMinimized, setSearchMinimized,
+    selectedWorkspaceId
   } = useCatalogContext();
 
   const {
@@ -27,17 +28,38 @@ function ChileMapOrchestrator() {
 
   const { estadoIngesta, mensajeIngesta, manejarSubidaArchivo } = useJsonIngestion(detalleSeleccionado?.workspace_id);
 
+  const [historyStack, setHistoryStack] = React.useState<string[]>([]);
+
   const handleSeleccionarPunto = React.useCallback(async (workspace_id: string | null, targetLng: number, targetLat: number) => {
+    if (!workspace_id) {
+       setHistoryStack([]);
+    } else if (selectedWorkspaceId && selectedWorkspaceId !== workspace_id) {
+       setHistoryStack(prev => [...prev, selectedWorkspaceId]);
+    }
+
     if (workspace_id) {
       cargarDetalleWorkspace(workspace_id);
     }
     seleccionarPunto(workspace_id, targetLng, targetLat);
-  }, [cargarDetalleWorkspace, seleccionarPunto]);
+  }, [cargarDetalleWorkspace, seleccionarPunto, selectedWorkspaceId]);
 
   const handleCerrarDetalle = React.useCallback(() => {
+    setHistoryStack([]);
     limpiarSeleccion();
     cerrarDetalle();
   }, [limpiarSeleccion, cerrarDetalle]);
+
+  const handleVolverAtras = React.useCallback(() => {
+      if (historyStack.length === 0) return;
+      const previousId = historyStack[historyStack.length - 1];
+      const previousPunto = filas.find(f => f.workspace_id === previousId);
+      
+      if (previousPunto && previousPunto.longitud && previousPunto.latitud) {
+          setHistoryStack(prev => prev.slice(0, -1));
+          cargarDetalleWorkspace(previousId);
+          seleccionarPunto(previousId, previousPunto.longitud, previousPunto.latitud);
+      }
+  }, [historyStack, filas, cargarDetalleWorkspace, seleccionarPunto]);
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-white">
@@ -89,6 +111,9 @@ function ChileMapOrchestrator() {
         estadoIngesta={estadoIngesta}
         mensajeIngesta={mensajeIngesta}
         manejarSubidaArchivo={manejarSubidaArchivo}
+        seleccionarPunto={handleSeleccionarPunto}
+        volverAtras={handleVolverAtras}
+        puedeVolverAtras={historyStack.length > 0}
       />
     </div>
   );

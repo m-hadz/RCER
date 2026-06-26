@@ -20,7 +20,19 @@ export async function getDetalleEstacion(workspace_id: string) {
     const estacion = await prisma.estacion.findUnique({
         where: { workspace_id },
         include: {
-            lakehouses: { include: { tablas: true } }
+            lakehouses: { include: { tablas: true } },
+            relacionesSalida: {
+                include: {
+                    destino: {
+                        select: {
+                            workspace_id: true,
+                            nombre: true,
+                            latitud: true,
+                            longitud: true
+                        }
+                    }
+                }
+            }
         }
     });
 
@@ -48,7 +60,8 @@ export async function getDetalleEstacion(workspace_id: string) {
         descripcion: estacion.descripcion,
         tema: estacion.tema,
         fecha_inicio: minDate,
-        fecha_fin: maxDate
+        fecha_fin: maxDate,
+        relaciones: estacion.relacionesSalida
     };
 }
 

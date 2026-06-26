@@ -23,6 +23,8 @@ model Estacion {
   longitud         Float?
 
   lakehouses Lakehouse[]
+  relacionesSalida Relacion[] @relation("RelacionesOrigen")
+  relacionesEntrada Relacion[] @relation("RelacionesDestino")
 }
 
 model Lakehouse {
@@ -65,4 +67,16 @@ model Columna {
 
   @@id([nombre_tabla, lakehouse_id, nombre_columna])
   @@index([nombre_tabla, lakehouse_id])
+}
+
+model Relacion {
+  estacion_origen_id String
+  estacion_destino_id String
+
+  origen  Estacion @relation("RelacionesOrigen", fields: [estacion_origen_id], references: [workspace_id])
+  destino Estacion @relation("RelacionesDestino", fields: [estacion_destino_id], references: [workspace_id])
+
+  @@id([estacion_origen_id, estacion_destino_id])
+  @@index([estacion_origen_id])
+  @@index([estacion_destino_id])
 }

@@ -7,9 +7,30 @@ import {
   getDetalleTabla
 } from "@/lib/actions";
 
+export interface RelacionDestino {
+  destino: {
+    workspace_id: string;
+    nombre: string;
+    latitud: number | null;
+    longitud: number | null;
+  };
+}
+
+export interface DetalleEstacion {
+  workspace_id: string;
+  nombre: string;
+  workspace_nombre: string;
+  ambiente?: string | null;
+  descripcion?: string | null;
+  tema?: string | null;
+  fecha_inicio?: Date | null;
+  fecha_fin?: Date | null;
+  relaciones?: RelacionDestino[];
+}
+
 export function useCatalogData() {
   const [filas, setFilas] = useState<any[]>([]);
-  const [detalleSeleccionado, setDetalleSeleccionado] = useState<any | null>(null);
+  const [detalleSeleccionado, setDetalleSeleccionado] = useState<DetalleEstacion | null>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [idCentroActual, setIdCentroActual] = useState<string | null>(null);
   const [entornosCentro, setEntornosCentro] = useState<any[] | null>(null);
