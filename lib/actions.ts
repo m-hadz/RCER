@@ -20,7 +20,19 @@ export async function getDetalleEstacion(workspace_id: string) {
     const estacion = await prisma.estacion.findUnique({
         where: { workspace_id },
         include: {
-            lakehouses: { include: { tablas: true } }
+            lakehouses: { include: { tablas: true } },
+            relacionesSalida: {
+                include: {
+                    destino: {
+                        select: {
+                            workspace_id: true,
+                            nombre: true,
+                            latitud: true,
+                            longitud: true
+                        }
+                    }
+                }
+            }
         }
     });
 
@@ -48,7 +60,8 @@ export async function getDetalleEstacion(workspace_id: string) {
         descripcion: estacion.descripcion,
         tema: estacion.tema,
         fecha_inicio: minDate,
-        fecha_fin: maxDate
+        fecha_fin: maxDate,
+        relaciones: estacion.relacionesSalida
     };
 }
 
@@ -76,23 +89,7 @@ export async function getDetalleTabla(lakehouse_id: string, nombre_tabla: string
             { nombre_columna: 'asc' }
         ]
     });
-
-    const linajeRaw = await prisma.tabla.findMany({
-        where: {
-            nombre_tabla,
-            lakehouse_id: { not: lakehouse_id }
-        },
-        include: { lakehouse: true }
-    });
-
-    const linaje = linajeRaw.map(t => ({
-        lakehouse_id: t.lakehouse_id,
-        capa: t.lakehouse?.capa,
-        ambiente: t.lakehouse?.ambiente,
-        total_registros: t.total_registros
-    }));
-
-    return { campos, linaje };
+    return { campos };
 }
 
 async function upsertColumnas(tx: any, columnas: any[], nombre_tabla: string, lakehouse_id: string) {
@@ -130,8 +127,26 @@ async function upsertLakehouses(tx: any, lakehouses: any[], workspace_id: string
     }
 }
 
-export async function ingerirPlantillaJson(plantilla: any) {
+export async function ingerirPlantillaJson(plantilla: any, expectedWorkspaceId?: string) {
     try {
+        if (expectedWorkspaceId) {
+            if (plantilla.workspace_id) {
+                if (plantilla.workspace_id !== expectedWorkspaceId) {
+                    return { success: false, error: "El JSON no corresponde a la estación actual." };
+                }
+            } else if (plantilla.lakehouse_id) {
+                const lakehouse = await prisma.lakehouse.findUnique({
+                    where: { lakehouse_id: plantilla.lakehouse_id }
+                });
+                if (!lakehouse) {
+                    return { success: false, error: "El lakehouse especificado en el JSON no existe." };
+                }
+                if (lakehouse.workspace_id !== expectedWorkspaceId) {
+                    return { success: false, error: "El lakehouse del JSON no pertenece a la estación actual." };
+                }
+            }
+        }
+
         await prisma.$transaction(async (tx) => {
             if (plantilla.workspace_id && !plantilla.lakehouse_id) {
                 await tx.estacion.upsert({

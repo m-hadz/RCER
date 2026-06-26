@@ -28,47 +28,95 @@ async function main() {
 
     await prisma.lakehouse.createMany({ data: lakehouses });
     const tablas = [
-        { nombre_tabla: 'thies_av1_raw', lakehouse_id: 'lh_pat_bronze', total_registros: 60064541, fecha_inicio: new Date('2018-12-15'), fecha_fin: new Date('2026-05-09'), col_temporal: 'timestamp_utc' },
-        { nombre_tabla: 'patagonia_iceberg_manifests', lakehouse_id: 'wh_pat_gold', total_registros: 142, fecha_inicio: new Date('2023-01-01'), fecha_fin: new Date('2026-05-19'), col_temporal: 'commit_time' },
+        { nombre_tabla: 'thies_clima_raw', lakehouse_id: 'lh_pat_bronze', total_registros: 4500120, fecha_inicio: new Date('2020-01-01'), fecha_fin: new Date('2026-05-01'), col_temporal: 'timestamp_utc' },
+
+        { nombre_tabla: 'censo_fauna_gold', lakehouse_id: 'wh_pat_gold', total_registros: 1540, fecha_inicio: new Date('2021-03-15'), fecha_fin: new Date('2025-11-20'), col_temporal: 'fecha_censo' },
+
+        { nombre_tabla: 'calidad_agua_cda', lakehouse_id: 'lh_cda_silver', total_registros: 340500, fecha_inicio: new Date('2023-01-10'), fecha_fin: new Date('2026-02-28'), col_temporal: 'fecha_lectura' },
+
+        { nombre_tabla: 'radiacion_solar_duckdb', lakehouse_id: 'lh_ata_silver', total_registros: 890000, fecha_inicio: new Date('2024-06-01'), fecha_fin: new Date('2026-06-20'), col_temporal: 'timestamp_iso' },
+
         { nombre_tabla: 'camaras_trampa_cv_bbox', lakehouse_id: 'lh_pat_silver', total_registros: 84530, fecha_inicio: new Date('2019-04-09'), fecha_fin: new Date('2023-11-07'), col_temporal: 'capture_date' },
-        { nombre_tabla: 'cr1000x_duckdb_optimized', lakehouse_id: 'lh_ata_silver', total_registros: 450890, fecha_inicio: new Date('2025-07-29'), fecha_fin: new Date('2025-09-01'), col_temporal: 'TIMESTAMP_ISO' },
-        { nombre_tabla: 'cr1000xseries_table10min', lakehouse_id: 'lh_ata_silver', total_registros: 4867, fecha_inicio: new Date('2025-07-29'), fecha_fin: new Date('2025-09-01'), col_temporal: 'TIMESTAMP_ISO' },
-        { nombre_tabla: 'cda_niebla_sensores', lakehouse_id: 'lh_cda_silver', total_registros: 120500, fecha_inicio: new Date('2024-01-01'), fecha_fin: new Date('2025-12-31'), col_temporal: 'fecha_lectura' },
-        { nombre_tabla: 'loa_arkg_triples', lakehouse_id: 'lh_loa_bronze', total_registros: 254000, fecha_inicio: null, fecha_fin: null, col_temporal: 'extraction_date' },
-        { nombre_tabla: 'loa_prospeccion_geo', lakehouse_id: 'lh_loa_bronze', total_registros: 3420, fecha_inicio: new Date('2023-04-24'), fecha_fin: new Date('2023-04-26'), col_temporal: 'fecha_hallazgo' },
-        { nombre_tabla: 'saviia_sparql_endpoints', lakehouse_id: 'lh_torre_bronze', total_registros: 12, fecha_inicio: null, fecha_fin: null, col_temporal: null },
-        { nombre_tabla: 'participantes_iie_anonymized', lakehouse_id: 'lh_cedel_bronze', total_registros: 558, fecha_inicio: null, fecha_fin: null, col_temporal: 'registration_date' }
+
+        { nombre_tabla: 'loa_arq_hallazgos', lakehouse_id: 'lh_loa_bronze', total_registros: 12500, fecha_inicio: new Date('2015-10-01'), fecha_fin: new Date('2024-04-12'), col_temporal: 'fecha_excavacion' },
+
+        { nombre_tabla: 'cedel_encuestas_sociales', lakehouse_id: 'lh_cedel_bronze', total_registros: 4320, fecha_inicio: new Date('2022-03-01'), fecha_fin: new Date('2025-12-15'), col_temporal: 'fecha_registro' },
+
+        { nombre_tabla: 'sparql_endpoints_metrics', lakehouse_id: 'lh_torre_bronze', total_registros: 678000, fecha_inicio: new Date('2025-01-01'), fecha_fin: new Date('2026-06-25'), col_temporal: 'query_timestamp' },
+
+        { nombre_tabla: 'vientos_patagonia_raw', lakehouse_id: 'lh_pat_bronze', total_registros: 525600, fecha_inicio: new Date('2025-01-01'), fecha_fin: new Date('2025-12-31'), col_temporal: 'timestamp_utc' }
     ];
 
     await prisma.tabla.createMany({ data: tablas });
     const columnas = [
-        { nombre_columna: 'timestamp_utc', nombre_tabla: 'thies_av1_raw', lakehouse_id: 'lh_pat_bronze', tipo_dato: 'timestamp', es_nullable: false, es_temporal: true },
-        { nombre_columna: 'AirTemperature_C', nombre_tabla: 'thies_av1_raw', lakehouse_id: 'lh_pat_bronze', tipo_dato: 'double', es_nullable: true, es_temporal: false },
-        { nombre_columna: 'snapshot_id', nombre_tabla: 'patagonia_iceberg_manifests', lakehouse_id: 'wh_pat_gold', tipo_dato: 'bigint', es_nullable: false, es_temporal: false },
-        { nombre_columna: 'added_data_files_count', nombre_tabla: 'patagonia_iceberg_manifests', lakehouse_id: 'wh_pat_gold', tipo_dato: 'int', es_nullable: false, es_temporal: false },
-        { nombre_columna: 'capture_date', nombre_tabla: 'camaras_trampa_cv_bbox', lakehouse_id: 'lh_pat_silver', tipo_dato: 'date', es_nullable: false, es_temporal: true },
-        { nombre_columna: 'bounding_box_json', nombre_tabla: 'camaras_trampa_cv_bbox', lakehouse_id: 'lh_pat_silver', tipo_dato: 'json', es_nullable: false, es_temporal: false },
-        { nombre_columna: 'confidence_score', nombre_tabla: 'camaras_trampa_cv_bbox', lakehouse_id: 'lh_pat_silver', tipo_dato: 'float', es_nullable: false, es_temporal: false },
-        { nombre_columna: 'TIMESTAMP_ISO', nombre_tabla: 'cr1000x_duckdb_optimized', lakehouse_id: 'lh_ata_silver', tipo_dato: 'timestamp', es_nullable: false, es_temporal: true },
-        { nombre_columna: 'AirTC_Avg', nombre_tabla: 'cr1000x_duckdb_optimized', lakehouse_id: 'lh_ata_silver', tipo_dato: 'double', es_nullable: true, es_temporal: false },
-        { nombre_columna: 'TIMESTAMP_ISO', nombre_tabla: 'cr1000xseries_table10min', lakehouse_id: 'lh_ata_silver', tipo_dato: 'timestamp', es_nullable: false, es_temporal: true },
-        { nombre_columna: 'Solar_Radiation_Wm2', nombre_tabla: 'cr1000xseries_table10min', lakehouse_id: 'lh_ata_silver', tipo_dato: 'double', es_nullable: true, es_temporal: false },
-        { nombre_columna: 'Soil_Moisture_VWC', nombre_tabla: 'cr1000xseries_table10min', lakehouse_id: 'lh_ata_silver', tipo_dato: 'double', es_nullable: true, es_temporal: false },
-        { nombre_columna: 'Wind_Speed_ms', nombre_tabla: 'cr1000xseries_table10min', lakehouse_id: 'lh_ata_silver', tipo_dato: 'double', es_nullable: true, es_temporal: false },
-        { nombre_columna: 'Albedo_Avg', nombre_tabla: 'cr1000xseries_table10min', lakehouse_id: 'lh_ata_silver', tipo_dato: 'double', es_nullable: true, es_temporal: false },
-        { nombre_columna: 'Battery_Voltage_Min', nombre_tabla: 'cr1000xseries_table10min', lakehouse_id: 'lh_ata_silver', tipo_dato: 'float', es_nullable: false, es_temporal: false },
-        { nombre_columna: 'Panel_Temperature_C', nombre_tabla: 'cr1000xseries_table10min', lakehouse_id: 'lh_ata_silver', tipo_dato: 'float', es_nullable: false, es_temporal: false },
-        { nombre_columna: 'subject_uri', nombre_tabla: 'loa_arkg_triples', lakehouse_id: 'lh_loa_bronze', tipo_dato: 'string', es_nullable: false, es_temporal: false },
-        { nombre_columna: 'predicate_uri', nombre_tabla: 'loa_arkg_triples', lakehouse_id: 'lh_loa_bronze', tipo_dato: 'string', es_nullable: false, es_temporal: false },
-        { nombre_columna: 'object_value', nombre_tabla: 'loa_arkg_triples', lakehouse_id: 'lh_loa_bronze', tipo_dato: 'string', es_nullable: true, es_temporal: false },
-        { nombre_columna: 'geometry_geojson', nombre_tabla: 'loa_prospeccion_geo', lakehouse_id: 'lh_loa_bronze', tipo_dato: 'json', es_nullable: false, es_temporal: false },
-        { nombre_columna: 'maplibre_cluster_id', nombre_tabla: 'loa_prospeccion_geo', lakehouse_id: 'lh_loa_bronze', tipo_dato: 'int', es_nullable: true, es_temporal: false },
-        { nombre_columna: 'rdf_type', nombre_tabla: 'loa_prospeccion_geo', lakehouse_id: 'lh_loa_bronze', tipo_dato: 'string', es_nullable: true, es_temporal: false },
-        { nombre_columna: 'endpoint_url', nombre_tabla: 'saviia_sparql_endpoints', lakehouse_id: 'lh_torre_bronze', tipo_dato: 'string', es_nullable: false, es_temporal: false },
-        { nombre_columna: 'ontology_version', nombre_tabla: 'saviia_sparql_endpoints', lakehouse_id: 'lh_torre_bronze', tipo_dato: 'string', es_nullable: true, es_temporal: false }
+        { nombre_tabla: 'thies_clima_raw', lakehouse_id: 'lh_pat_bronze', nombre_columna: 'timestamp_utc', tipo_dato: 'timestamp', es_nullable: false, es_temporal: true },
+        { nombre_tabla: 'thies_clima_raw', lakehouse_id: 'lh_pat_bronze', nombre_columna: 'temperatura_c', tipo_dato: 'float', es_nullable: true, es_temporal: false },
+        { nombre_tabla: 'thies_clima_raw', lakehouse_id: 'lh_pat_bronze', nombre_columna: 'humedad_relativa_pct', tipo_dato: 'float', es_nullable: true, es_temporal: false },
+        { nombre_tabla: 'thies_clima_raw', lakehouse_id: 'lh_pat_bronze', nombre_columna: 'sensor_estado', tipo_dato: 'string', es_nullable: false, es_temporal: false },
+
+        { nombre_tabla: 'censo_fauna_gold', lakehouse_id: 'wh_pat_gold', nombre_columna: 'fecha_censo', tipo_dato: 'date', es_nullable: false, es_temporal: true },
+        { nombre_tabla: 'censo_fauna_gold', lakehouse_id: 'wh_pat_gold', nombre_columna: 'especie_nombre', tipo_dato: 'string', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'censo_fauna_gold', lakehouse_id: 'wh_pat_gold', nombre_columna: 'individuos_contados', tipo_dato: 'int', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'censo_fauna_gold', lakehouse_id: 'wh_pat_gold', nombre_columna: 'zona_observacion', tipo_dato: 'string', es_nullable: true, es_temporal: false },
+
+        { nombre_tabla: 'calidad_agua_cda', lakehouse_id: 'lh_cda_silver', nombre_columna: 'fecha_lectura', tipo_dato: 'timestamp', es_nullable: false, es_temporal: true },
+        { nombre_tabla: 'calidad_agua_cda', lakehouse_id: 'lh_cda_silver', nombre_columna: 'nivel_ph', tipo_dato: 'float', es_nullable: true, es_temporal: false },
+        { nombre_tabla: 'calidad_agua_cda', lakehouse_id: 'lh_cda_silver', nombre_columna: 'salinidad_ppm', tipo_dato: 'float', es_nullable: true, es_temporal: false },
+        { nombre_tabla: 'calidad_agua_cda', lakehouse_id: 'lh_cda_silver', nombre_columna: 'profundidad_metros', tipo_dato: 'int', es_nullable: false, es_temporal: false },
+
+        { nombre_tabla: 'radiacion_solar_duckdb', lakehouse_id: 'lh_ata_silver', nombre_columna: 'timestamp_iso', tipo_dato: 'timestamp', es_nullable: false, es_temporal: true },
+        { nombre_tabla: 'radiacion_solar_duckdb', lakehouse_id: 'lh_ata_silver', nombre_columna: 'irradiancia_wm2', tipo_dato: 'float', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'radiacion_solar_duckdb', lakehouse_id: 'lh_ata_silver', nombre_columna: 'indice_uv', tipo_dato: 'int', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'radiacion_solar_duckdb', lakehouse_id: 'lh_ata_silver', nombre_columna: 'albedo_avg', tipo_dato: 'float', es_nullable: true, es_temporal: false },
+
+        { nombre_tabla: 'camaras_trampa_cv_bbox', lakehouse_id: 'lh_pat_silver', nombre_columna: 'capture_date', tipo_dato: 'timestamp', es_nullable: false, es_temporal: true },
+        { nombre_tabla: 'camaras_trampa_cv_bbox', lakehouse_id: 'lh_pat_silver', nombre_columna: 'confidence_score', tipo_dato: 'float', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'camaras_trampa_cv_bbox', lakehouse_id: 'lh_pat_silver', nombre_columna: 'bounding_box_area', tipo_dato: 'int', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'camaras_trampa_cv_bbox', lakehouse_id: 'lh_pat_silver', nombre_columna: 'modelo_inferencia', tipo_dato: 'string', es_nullable: false, es_temporal: false },
+
+        { nombre_tabla: 'loa_arq_hallazgos', lakehouse_id: 'lh_loa_bronze', nombre_columna: 'fecha_excavacion', tipo_dato: 'date', es_nullable: false, es_temporal: true },
+        { nombre_tabla: 'loa_arq_hallazgos', lakehouse_id: 'lh_loa_bronze', nombre_columna: 'rdf_type', tipo_dato: 'string', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'loa_arq_hallazgos', lakehouse_id: 'lh_loa_bronze', nombre_columna: 'peso_gramos', tipo_dato: 'float', es_nullable: true, es_temporal: false },
+        { nombre_tabla: 'loa_arq_hallazgos', lakehouse_id: 'lh_loa_bronze', nombre_columna: 'maplibre_cluster_id', tipo_dato: 'int', es_nullable: true, es_temporal: false },
+
+        { nombre_tabla: 'cedel_encuestas_sociales', lakehouse_id: 'lh_cedel_bronze', nombre_columna: 'fecha_registro', tipo_dato: 'date', es_nullable: false, es_temporal: true },
+        { nombre_tabla: 'cedel_encuestas_sociales', lakehouse_id: 'lh_cedel_bronze', nombre_columna: 'grupo_etario', tipo_dato: 'string', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'cedel_encuestas_sociales', lakehouse_id: 'lh_cedel_bronze', nombre_columna: 'nivel_ingresos_usd', tipo_dato: 'int', es_nullable: true, es_temporal: false },
+        { nombre_tabla: 'cedel_encuestas_sociales', lakehouse_id: 'lh_cedel_bronze', nombre_columna: 'satisfaccion_indice', tipo_dato: 'float', es_nullable: false, es_temporal: false },
+
+        { nombre_tabla: 'sparql_endpoints_metrics', lakehouse_id: 'lh_torre_bronze', nombre_columna: 'query_timestamp', tipo_dato: 'timestamp', es_nullable: false, es_temporal: true },
+        { nombre_tabla: 'sparql_endpoints_metrics', lakehouse_id: 'lh_torre_bronze', nombre_columna: 'execution_time_ms', tipo_dato: 'float', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'sparql_endpoints_metrics', lakehouse_id: 'lh_torre_bronze', nombre_columna: 'triples_returned', tipo_dato: 'int', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'sparql_endpoints_metrics', lakehouse_id: 'lh_torre_bronze', nombre_columna: 'query_type', tipo_dato: 'string', es_nullable: false, es_temporal: false },
+
+        { nombre_tabla: 'vientos_patagonia_raw', lakehouse_id: 'lh_pat_bronze', nombre_columna: 'timestamp_utc', tipo_dato: 'timestamp', es_nullable: false, es_temporal: true },
+        { nombre_tabla: 'vientos_patagonia_raw', lakehouse_id: 'lh_pat_bronze', nombre_columna: 'velocidad_viento_ms', tipo_dato: 'float', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'vientos_patagonia_raw', lakehouse_id: 'lh_pat_bronze', nombre_columna: 'direccion_viento_grados', tipo_dato: 'int', es_nullable: false, es_temporal: false },
+        { nombre_tabla: 'vientos_patagonia_raw', lakehouse_id: 'lh_pat_bronze', nombre_columna: 'rafaga_maxima_ms', tipo_dato: 'float', es_nullable: true, es_temporal: false },
+        { nombre_tabla: 'vientos_patagonia_raw', lakehouse_id: 'lh_pat_bronze', nombre_columna: 'estacion_id', tipo_dato: 'string', es_nullable: false, es_temporal: false }
     ];
 
     await prisma.columna.createMany({ data: columnas });
+    const relaciones = [
+        { estacion_origen_id: 'ws_patagonia', estacion_destino_id: 'ws_cda' },
+        { estacion_origen_id: 'ws_patagonia', estacion_destino_id: 'ws_cedel' },
+
+        { estacion_origen_id: 'ws_cda', estacion_destino_id: 'ws_torre' },
+
+        { estacion_origen_id: 'ws_atacama', estacion_destino_id: 'ws_torre' },
+        { estacion_origen_id: 'ws_atacama', estacion_destino_id: 'ws_cedel' },
+
+        { estacion_origen_id: 'ws_torre', estacion_destino_id: 'ws_atacama' },
+
+        { estacion_origen_id: 'ws_loa', estacion_destino_id: 'ws_patagonia' },
+        { estacion_origen_id: 'ws_loa', estacion_destino_id: 'ws_atacama' },
+        { estacion_origen_id: 'ws_loa', estacion_destino_id: 'ws_cedel' },
+
+        { estacion_origen_id: 'ws_cedel', estacion_destino_id: 'ws_torre' },
+        { estacion_origen_id: 'ws_cedel', estacion_destino_id: 'ws_loa' }
+    ];
+
+    await prisma.relacion.createMany({ data: relaciones });
 }
 
 main()
