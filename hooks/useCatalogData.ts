@@ -25,6 +25,7 @@ export interface DetalleEstacion {
   tema?: string | null;
   fecha_inicio?: Date | null;
   fecha_fin?: Date | null;
+  imagenes?: { url: string }[];
   relaciones?: RelacionDestino[];
 }
 

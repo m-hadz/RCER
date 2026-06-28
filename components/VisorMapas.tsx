@@ -1,5 +1,5 @@
 import * as React from "react";
-import Map, { NavigationControl, Source, Layer, Popup, MapRef, MapLayerMouseEvent } from "react-map-gl/maplibre";
+import Map, { NavigationControl, Source, Layer, Popup, MapRef, MapLayerMouseEvent, Marker } from "react-map-gl/maplibre";
 import { HoverInfo, GeoJSONFeatureCollection, JumpOptions, MapViewState } from "@/hooks/useMapManager";
 
 export interface VisorMapasProps {
@@ -115,6 +115,70 @@ export default function VisorMapas({
           />
         </Source>
       )}
+      {(() => {
+        if (selectedWorkspaceId) return null;
+
+        const featuresWithImages = [...(geojsonPuntos?.features || [])]
+          .filter(f => (f.properties as any).imagen_url)
+          .sort((a, b) => (b.geometry as any).coordinates[1] - (a.geometry as any).coordinates[1]);
+
+        return featuresWithImages.map((feature, index) => {
+          const coords = (feature.geometry as any).coordinates;
+          const { workspace_id, nombre, imagen_url } = feature.properties as any;
+
+          const distance = 90 + (index % 4) * 65;
+          const y2 = -distance;
+
+          return (
+            <Marker
+              key={workspace_id}
+              longitude={coords[0]}
+              latitude={coords[1]}
+              anchor="center"
+            >
+              <svg
+                className="absolute pointer-events-none"
+                style={{ overflow: 'visible', top: 0, left: 0 }}
+              >
+                <line x1="0" y1="-8" x2="0" y2={y2} stroke="#9ca3af" strokeWidth="2" strokeDasharray="4 2" />
+              </svg>
+
+              <div
+                className="absolute pointer-events-auto flex items-center gap-2"
+                style={{ left: '-30px', top: `${y2 - 30}px` }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  seleccionarPunto(workspace_id, coords[0], coords[1]);
+                }}
+                onMouseEnter={() => {
+                  setCursor("pointer");
+                }}
+                onMouseLeave={() => {
+                  setCursor("grab");
+                }}
+                onMouseMove={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <div
+                  className={`w-[60px] h-[60px] flex-shrink-0 rounded-full shadow-[0_4px_6px_rgba(0,0,0,0.3)] overflow-hidden cursor-pointer hover:scale-110 transition-transform ${selectedWorkspaceId === workspace_id ? "border-emerald-500 border-[4px]" : "border-slate-800 border-[3px]"}`}
+                >
+                  <img src={imagen_url} alt={nombre} className="w-full h-full object-cover pointer-events-none" />
+                </div>
+
+                <div className="px-1 py-1 pointer-events-none whitespace-nowrap">
+                  <span
+                    className="text-[13px] font-extrabold text-[#0066cc] uppercase tracking-wide"
+                    style={{ WebkitTextStroke: '0.5px white', textShadow: '0px 1px 2px rgba(255,255,255,0.8)' }}
+                  >
+                    {nombre}
+                  </span>
+                </div>
+              </div>
+            </Marker>
+          );
+        });
+      })()}
     </>
   );
 

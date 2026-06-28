@@ -4,6 +4,7 @@ import ExploradorActivo from "./PanelDerecho/ExploradorActivo";
 import ListaTablas from "./PanelDerecho/ListaTablas";
 import SelectorEntorno from "./PanelDerecho/SelectorEntorno";
 import PanelResumen from "./PanelDerecho/PanelResumen";
+import ImageCarousel from "./PanelDerecho/ImageCarousel";
 
 export interface PanelDetalleDerechoProps {
   estadoIngesta: "idle" | "cargando" | "exito" | "error";
@@ -78,6 +79,8 @@ export default function PanelDetalleDerecho({
             <div>
               <SelectorEntorno />
               <PanelResumen />
+              
+              <ImageCarousel imagenes={detalleSeleccionado.imagenes} />
               
               {detalleSeleccionado.relaciones && detalleSeleccionado.relaciones.length > 0 && (
                 <section className="mt-8 animate-in fade-in duration-500">
