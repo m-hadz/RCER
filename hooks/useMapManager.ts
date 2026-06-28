@@ -77,7 +77,11 @@ export function useMapManager(filas: FilaMarcador[]) {
                 type: "Feature",
                 id: index,
                 geometry: { type: "Point", coordinates: [Number(f.longitud), Number(f.latitud)] },
-                properties: { workspace_id: f.workspace_id, nombre: f.nombre },
+                properties: { 
+                    workspace_id: f.workspace_id, 
+                    nombre: f.nombre,
+                    ...(f.url_foto_principal ? { imagen_url: f.url_foto_principal } : {})
+                },
             })),
         };
     }, [filas]);

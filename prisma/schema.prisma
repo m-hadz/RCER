@@ -21,10 +21,12 @@ model Estacion {
   ambiente         String?
   latitud          Float?
   longitud         Float?
+  url_foto_principal String?
 
   lakehouses Lakehouse[]
   relacionesSalida Relacion[] @relation("RelacionesOrigen")
   relacionesEntrada Relacion[] @relation("RelacionesDestino")
+  imagenes Imagen[]
 }
 
 model Lakehouse {
@@ -79,4 +81,15 @@ model Relacion {
   @@id([estacion_origen_id, estacion_destino_id])
   @@index([estacion_origen_id])
   @@index([estacion_destino_id])
+}
+
+model Imagen {
+  id           Int      @id @default(autoincrement())
+  url          String
+  descripcion  String?
+  workspace_id String   
+  
+  estacion     Estacion @relation(fields: [workspace_id], references: [workspace_id])
+
+  @@index([workspace_id])
 }

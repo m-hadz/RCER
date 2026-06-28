@@ -12,6 +12,7 @@ export async function getMarcadores() {
             workspace_nombre: true,
             latitud: true,
             longitud: true,
+            url_foto_principal: true,
         },
     });
 }
@@ -21,6 +22,7 @@ export async function getDetalleEstacion(workspace_id: string) {
         where: { workspace_id },
         include: {
             lakehouses: { include: { tablas: true } },
+            imagenes: { select: { url: true } },
             relacionesSalida: {
                 include: {
                     destino: {
@@ -61,6 +63,7 @@ export async function getDetalleEstacion(workspace_id: string) {
         tema: estacion.tema,
         fecha_inicio: minDate,
         fecha_fin: maxDate,
+        imagenes: estacion.imagenes,
         relaciones: estacion.relacionesSalida
     };
 }
