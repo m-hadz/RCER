@@ -117,7 +117,7 @@ export function useMapManager(filas: FilaMarcador[]) {
             try {
                 mapRefDefault.current?.getMap().resize();
             } catch (e) { }
-            mapRefDefault.current?.flyTo(targetState as any);
+            mapRefDefault.current?.easeTo(targetState as any);
         }, 200);
 
         setTimeout(() => {
@@ -135,11 +135,12 @@ export function useMapManager(filas: FilaMarcador[]) {
         const hasCoords = targetLng != null && targetLat != null && !isNaN(targetLng) && !isNaN(targetLat) && targetLng !== 0 && targetLat !== 0;
 
         if (hasCoords) {
+            const rightPadding = typeof window !== 'undefined' ? window.innerWidth * 0.66 : 0;
             const flightOptions: FlightOptions = {
                 center: [targetLng, targetLat],
                 zoom: 6.5,
                 bearing: 0,
-                padding: { right: 0, left: 0, top: 0, bottom: 0 },
+                padding: { right: rightPadding, left: 0, top: 0, bottom: 0 },
                 duration: 1000
             };
 
@@ -155,9 +156,7 @@ export function useMapManager(filas: FilaMarcador[]) {
             }
 
             setTimeout(() => {
-                try { mapRefDefault.current?.getMap().resize(); } catch (e) { }
-                try { mapRefOutdoor.current?.getMap().resize(); } catch (e) { }
-                mapRefDefault.current?.flyTo(flightOptions as any);
+                mapRefDefault.current?.easeTo(flightOptions as any);
             }, 50);
 
             setTimeout(() => {
