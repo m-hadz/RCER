@@ -29,12 +29,14 @@ function ChileMapOrchestrator() {
   const { estadoIngesta, mensajeIngesta, manejarSubidaArchivo } = useJsonIngestion(detalleSeleccionado?.workspace_id);
 
   const [historyStack, setHistoryStack] = React.useState<string[]>([]);
+  const [forwardStack, setForwardStack] = React.useState<string[]>([]);
 
   const handleSeleccionarPunto = React.useCallback(async (workspace_id: string | null, targetLng: number, targetLat: number) => {
+    setForwardStack([]);
     if (!workspace_id) {
-       setHistoryStack([]);
+      setHistoryStack([]);
     } else if (selectedWorkspaceId && selectedWorkspaceId !== workspace_id) {
-       setHistoryStack(prev => [...prev, selectedWorkspaceId]);
+      setHistoryStack(prev => [...prev, selectedWorkspaceId]);
     }
 
     if (workspace_id) {
@@ -45,6 +47,7 @@ function ChileMapOrchestrator() {
 
   const handleCerrarDetalle = React.useCallback(() => {
     setHistoryStack([]);
+    setForwardStack([]);
     limpiarSeleccion();
     cerrarDetalle();
   }, [limpiarSeleccion, cerrarDetalle]);
@@ -55,11 +58,29 @@ function ChileMapOrchestrator() {
       const previousPunto = filas.find(f => f.workspace_id === previousId);
       
       if (previousPunto && previousPunto.longitud && previousPunto.latitud) {
+          if (selectedWorkspaceId) {
+              setForwardStack(prev => [...prev, selectedWorkspaceId]);
+          }
           setHistoryStack(prev => prev.slice(0, -1));
           cargarDetalleWorkspace(previousId);
           seleccionarPunto(previousId, previousPunto.longitud, previousPunto.latitud);
       }
-  }, [historyStack, filas, cargarDetalleWorkspace, seleccionarPunto]);
+  }, [historyStack, selectedWorkspaceId, filas, cargarDetalleWorkspace, seleccionarPunto]);
+
+  const handleVolverAdelante = React.useCallback(() => {
+      if (forwardStack.length === 0) return;
+      const nextId = forwardStack[forwardStack.length - 1];
+      const nextPunto = filas.find(f => f.workspace_id === nextId);
+      
+      if (nextPunto && nextPunto.longitud && nextPunto.latitud) {
+          if (selectedWorkspaceId) {
+              setHistoryStack(prev => [...prev, selectedWorkspaceId]);
+          }
+          setForwardStack(prev => prev.slice(0, -1));
+          cargarDetalleWorkspace(nextId);
+          seleccionarPunto(nextId, nextPunto.longitud, nextPunto.latitud);
+      }
+  }, [forwardStack, selectedWorkspaceId, filas, cargarDetalleWorkspace, seleccionarPunto]);
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-white">
@@ -114,6 +135,8 @@ function ChileMapOrchestrator() {
         seleccionarPunto={handleSeleccionarPunto}
         volverAtras={handleVolverAtras}
         puedeVolverAtras={historyStack.length > 0}
+        volverAdelante={handleVolverAdelante}
+        puedeVolverAdelante={forwardStack.length > 0}
       />
     </div>
   );
