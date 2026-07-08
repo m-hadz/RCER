@@ -13,6 +13,8 @@ export interface PanelDetalleDerechoProps {
   seleccionarPunto?: (workspace_id: string | null, targetLng: number, targetLat: number) => void;
   volverAtras?: () => void;
   puedeVolverAtras?: boolean;
+  volverAdelante?: () => void;
+  puedeVolverAdelante?: boolean;
 }
 
 export default function PanelDetalleDerecho({
@@ -21,7 +23,9 @@ export default function PanelDetalleDerecho({
   manejarSubidaArchivo,
   seleccionarPunto,
   volverAtras,
-  puedeVolverAtras
+  puedeVolverAtras,
+  volverAdelante,
+  puedeVolverAdelante
 }: PanelDetalleDerechoProps) {
   const { detalleSeleccionado, selectedWorkspaceId, activosLakehouse, cargandoActivos, tablaActiva } = useCatalogContext();
 
@@ -38,15 +42,26 @@ export default function PanelDetalleDerecho({
         <>
           <div className="h-full overflow-y-auto transition-all duration-500 ease-in-out border-r border-gray-200 w-1/2 p-8 md:p-12 relative">
             <article className="max-w-3xl mx-auto min-w-[400px]">
-              {puedeVolverAtras && (
-                <button 
-                  onClick={volverAtras}
-                  className="mb-6 inline-flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-gray-50 transition-colors rounded-lg text-xs font-semibold border border-gray-200 shadow-sm text-gray-800 group"
-                >
-                  <svg className="w-4 h-4 transform group-hover:-translate-x-1 transition-transform text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                  Volver al anterior
-                </button>
-              )}
+              <div className="flex gap-3 mb-6">
+                {puedeVolverAtras && (
+                  <button
+                    onClick={volverAtras}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-gray-50 transition-colors rounded-lg text-xs font-semibold border border-gray-200 shadow-sm text-gray-800 group"
+                  >
+                    <svg className="w-4 h-4 transform group-hover:-translate-x-1 transition-transform text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    Volver al anterior
+                  </button>
+                )}
+                {puedeVolverAdelante && (
+                  <button
+                    onClick={volverAdelante}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-gray-50 transition-colors rounded-lg text-xs font-semibold border border-gray-200 shadow-sm text-gray-800 group"
+                  >
+                    Volver al posterior
+                    <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                  </button>
+                )}
+              </div>
               <header className="mb-8 border-b border-gray-200 pb-8 text-wrap">
                 <div className="flex flex-col 2xl:flex-row 2xl:items-start justify-between gap-6 mb-4">
                   <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900 flex-1 break-words">
@@ -79,9 +94,9 @@ export default function PanelDetalleDerecho({
             <div>
               <SelectorEntorno />
               <PanelResumen />
-              
+
               <ImageCarousel imagenes={detalleSeleccionado.imagenes} />
-              
+
               {detalleSeleccionado.relaciones && detalleSeleccionado.relaciones.length > 0 && (
                 <section className="mt-8 animate-in fade-in duration-500">
                   <h2 className="text-2xl font-bold mb-4 text-gray-900">Véase También</h2>

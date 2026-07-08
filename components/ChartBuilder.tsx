@@ -26,6 +26,12 @@ interface ChartBuilderProps {
     campos: Campo[];
 }
 
+export interface WindRoseConfig {
+    numBins?: number;
+    resolution?: number;
+    baseColorHSL?: { h: number, s: number, lStart: number, lEnd: number };
+}
+
 export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: ChartBuilderProps) {
     const [tipoGrafico, setTipoGrafico] = React.useState<string>("");
     const [ejeX, setEjeX] = React.useState<string>("");
@@ -65,70 +71,111 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
         }
     };
 
-    const generarTrace = () => {
-        if (!datosGrafico) return {};
+    const processWindRose = (data: any[], colDirection: string, colSpeed: string, config: WindRoseConfig = {}) => {
+        const {
+            numBins = 5,
+            resolution = 16,
+            baseColorHSL = { h: 3, s: 80, lStart: 90, lEnd: 30 }
+        } = config;
+
+        let minSpeed = Infinity;
+        let maxSpeed = -Infinity;
+        const validData: { degrees: number, speed: number }[] = [];
+
+        data.forEach(d => {
+            const degrees = parseFloat(d[colDirection]);
+            const speed = parseFloat(d[colSpeed]);
+            if (!isNaN(degrees) && !isNaN(speed)) {
+                validData.push({ degrees, speed });
+                if (speed < minSpeed) minSpeed = speed;
+                if (speed > maxSpeed) maxSpeed = speed;
+            }
+        });
+
+        if (validData.length === 0) return [];
+        if (minSpeed === maxSpeed) {
+            minSpeed = Math.max(0, minSpeed - 1);
+            maxSpeed = maxSpeed + 1;
+        }
+
+        const rangeStep = (maxSpeed - minSpeed) / numBins;
+        const speedRanges = Array.from({ length: numBins }, (_, i) => {
+            const min = minSpeed + i * rangeStep;
+            const isLast = i === numBins - 1;
+            const max = isLast ? Infinity : min + rangeStep;
+            const displayMax = min + rangeStep;
+            
+            const l = baseColorHSL.lStart - (i / Math.max(1, numBins - 1)) * (baseColorHSL.lStart - baseColorHSL.lEnd);
+            const color = `hsl(${baseColorHSL.h}, ${baseColorHSL.s}%, ${l}%)`;
+            
+            return {
+                name: isLast ? `> ${min.toFixed(1)}` : `${min.toFixed(1)} - ${displayMax.toFixed(1)}`,
+                min,
+                max,
+                color
+            };
+        });
+
+        const sectorAngle = 360 / resolution;
+        const directions = Array.from({ length: resolution }, (_, i) => {
+            if (resolution === 16) {
+                return ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"][i];
+            } else if (resolution === 8) {
+                return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][i];
+            }
+            return `${(i * sectorAngle).toFixed(1)}°`;
+        });
+
+        const groupedData: Record<string, number[]> = {};
+        speedRanges.forEach(r => groupedData[r.name] = new Array(resolution).fill(0));
+
+        validData.forEach(({ degrees, speed }) => {
+            let dirIndex = Math.floor(((degrees + (sectorAngle / 2)) % 360) / sectorAngle);
+            if (dirIndex === resolution) dirIndex = 0;
+
+            const range = speedRanges.find(r => speed >= r.min && speed < r.max) || speedRanges[speedRanges.length - 1];
+            groupedData[range.name][dirIndex] += 1;
+        });
+
+        return speedRanges.map(range => ({
+            r: groupedData[range.name],
+            theta: directions,
+            name: range.name,
+            type: "barpolar",
+            marker: { color: range.color, line: { color: 'white', width: 0.5 } }
+        }));
+    };
+
+    const generarTraces = (): any[] => {
+        if (!datosGrafico) return [];
+
+        if (tipoGrafico === "windrose") {
+            return processWindRose(datosGrafico, ejeX, ejeY);
+        }
 
         const xValues = datosGrafico.map(d => d[ejeX] || d.x);
         const yValues = datosGrafico.map(d => d[ejeY] || d.y);
 
-        if (tipoGrafico === "windrose") {
-            return {
-                r: yValues,
-                theta: xValues,
-                type: "barpolar",
-                marker: { color: '#10b981', line: { color: 'white', width: 1 } },
-                opacity: 0.8
-            };
-        }
-
         if (tipoGrafico === "density") {
-            return {
-                x: xValues,
-                y: yValues,
-                type: "histogram2dcontour",
-                colorscale: "Viridis"
-            };
+            return [{ x: xValues, y: yValues, type: "histogram2dcontour", colorscale: "Viridis" }];
         }
 
         if (tipoGrafico === "violin") {
-            return {
-                x: xValues,
-                y: yValues,
-                type: "violin",
-                box: { visible: true },
-                meanline: { visible: true },
-                points: "outliers",
-                line: { color: '#8b5cf6' }
-            };
+            return [{ x: xValues, y: yValues, type: "violin", box: { visible: true }, meanline: { visible: true }, points: "outliers", line: { color: '#8b5cf6' } }];
         }
 
         if (tipoGrafico === "bar_avg") {
-            return {
-                x: xValues,
-                y: yValues,
-                type: "histogram",
-                histfunc: "avg",
-                marker: { color: '#f59e0b', line: { color: 'white', width: 1 } }
-            };
+            return [{ x: xValues, y: yValues, type: "histogram", histfunc: "avg", marker: { color: '#f59e0b', line: { color: 'white', width: 1 } } }];
         }
 
-        const plotlyType =
-            tipoGrafico === "line" || tipoGrafico === "scatter" ? "scatter" :
-                tipoGrafico === "box" ? "box" :
-                    tipoGrafico === "bar" ? "bar" : "scatter";
+        const plotlyType = tipoGrafico === "line" || tipoGrafico === "scatter" ? "scatter" :
+                           tipoGrafico === "box" ? "box" :
+                           tipoGrafico === "bar" ? "bar" : "scatter";
 
-        const plotlyMode =
-            tipoGrafico === "line" ? "lines" :
-                tipoGrafico === "scatter" ? "markers" : undefined;
+        const plotlyMode = tipoGrafico === "line" ? "lines" :
+                           tipoGrafico === "scatter" ? "markers" : undefined;
 
-        return {
-            x: xValues,
-            y: yValues,
-            type: plotlyType,
-            mode: plotlyMode,
-            marker: { color: '#3b82f6' },
-            line: { color: '#3b82f6', width: 2 }
-        };
+        return [{ x: xValues, y: yValues, type: plotlyType, mode: plotlyMode, marker: { color: '#3b82f6' }, line: { color: '#3b82f6', width: 2 } }];
     };
 
     const generarLayout = () => {
@@ -143,8 +190,11 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
         if (tipoGrafico === "windrose") {
             return {
                 ...baseLayout,
+                barmode: "stack",
+                showlegend: true,
                 polar: {
-                    angularaxis: { direction: "clockwise" }
+                    angularaxis: { direction: "clockwise" },
+                    radialaxis: { angle: 90 }
                 }
             };
         }
@@ -296,7 +346,7 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
                     {datosGrafico && (
                         <div className={cargandoDatos ? "opacity-50 blur-sm pointer-events-none transition-all duration-300" : "opacity-100 animate-in fade-in duration-500"}>
                             <Plot
-                                data={[generarTrace() as any]}
+                                data={generarTraces()}
                                 layout={generarLayout()}
                                 useResizeHandler={true}
                                 style={{ width: "100%", height: "400px" }}
