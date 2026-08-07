@@ -206,6 +206,14 @@ async function main() {
             fecha_inicio: new Date('2025-01-01'),
             fecha_fin: new Date('2025-12-31'),
             col_temporal: 'timestamp_utc'
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            total_registros: 62,
+            fecha_inicio: new Date('2025-01-01'),
+            fecha_fin: new Date('2025-12-31'),
+            col_temporal: 'timestamp_utc'
         }
     ];
 
@@ -514,6 +522,150 @@ async function main() {
             tipo_dato: 'string',
             es_nullable: false,
             es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Mes',
+            tipo_dato: 'timestamp',
+            es_nullable: false,
+            es_temporal: true
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Presion_hPa_mean',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Temperatura_C_mean',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Temperatura_C_max',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Temperatura_C_min',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Precipitacion_mm_sum',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Velocidad_viento_ms_mean',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Velocidad_viento_ms_max',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Velocidad_viento_ms_min',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Direccion_viento_mean',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Humedad_Relativa_mean',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Humedad_Relativa_max',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Humedad_Relativa_min',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Radiacion_Wm2_sum',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'CO2_ppm_mean',
+            tipo_dato: 'float',
+            es_nullable: false,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Humedad_suelo_mean',
+            tipo_dato: 'float',
+            es_nullable: true,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Temp_suelo_C_mean',
+            tipo_dato: 'float',
+            es_nullable: true,
+            es_temporal: false
+        },
+        {
+            nombre_tabla: 'meteo_monthly_agg',
+            lakehouse_id: 'lh_ata_silver',
+            nombre_columna: 'Fecha_procesamiento',
+            tipo_dato: 'timestamp',
+            es_nullable: false,
+            es_temporal: true
         }
     ];
 

@@ -36,6 +36,7 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
     const [tipoGrafico, setTipoGrafico] = React.useState<string>("");
     const [ejeX, setEjeX] = React.useState<string>("");
     const [ejeY, setEjeY] = React.useState<string>("");
+    const [ejeY2, setEjeY2] = React.useState<string>("");
     const [cargandoDatos, setCargandoDatos] = React.useState<boolean>(false);
     const [datosGrafico, setDatosGrafico] = React.useState<any[] | null>(null);
     const [error, setError] = React.useState<string | null>(null);
@@ -56,19 +57,84 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
     }, [tipoGrafico, columnasTemporales, ejeX]);
 
     const handleGenerarGrafico = async () => {
-        if (!tipoGrafico || !ejeX || !ejeY) return;
+        const isHeatmap = tipoGrafico === "heatmap";
+        const isDualAxis = tipoGrafico === "dual_axis";
+
+        if (!tipoGrafico) return;
+        if (!isHeatmap && (!ejeX || !ejeY)) return;
+        if (isDualAxis && !ejeY2) return;
 
         setCargandoDatos(true);
         setError(null);
 
         try {
-            const datos = await obtenerDatosParaGrafico(lakehouseId, tablaNombre, [ejeX, ejeY]);
+            let columnas = [];
+            if (isHeatmap) {
+                columnas = columnasNumericas.map(c => c.nombre_columna);
+            } else if (isDualAxis) {
+                columnas = [ejeX, ejeY, ejeY2];
+            } else {
+                columnas = [ejeX, ejeY];
+            }
+            const datos = await obtenerDatosParaGrafico(lakehouseId, tablaNombre, columnas);
             setDatosGrafico(datos);
         } catch (err: any) {
             setError(err.message || "Error al obtener los datos del Lakehouse.");
         } finally {
             setCargandoDatos(false);
         }
+    };
+
+    const calculateCorrelationMatrix = (data: any[], numericKeys: string[]) => {
+        const matrix: number[][] = [];
+        
+        const getMean = (key: string) => {
+            const values = data.map(d => parseFloat(d[key])).filter(v => !isNaN(v));
+            return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+        };
+
+        const means = numericKeys.reduce((acc, key) => {
+            acc[key] = getMean(key);
+            return acc;
+        }, {} as Record<string, number>);
+
+        for (let i = 0; i < numericKeys.length; i++) {
+            matrix[i] = [];
+            for (let j = 0; j < numericKeys.length; j++) {
+                const key1 = numericKeys[i];
+                const key2 = numericKeys[j];
+                
+                let numerator = 0;
+                let denom1 = 0;
+                let denom2 = 0;
+                
+                let count = 0;
+                for (let k = 0; k < data.length; k++) {
+                    const val1 = parseFloat(data[k][key1]);
+                    const val2 = parseFloat(data[k][key2]);
+                    
+                    if (!isNaN(val1) && !isNaN(val2)) {
+                        const diff1 = val1 - means[key1];
+                        const diff2 = val2 - means[key2];
+                        
+                        numerator += diff1 * diff2;
+                        denom1 += diff1 * diff1;
+                        denom2 += diff2 * diff2;
+                        count++;
+                    }
+                }
+                
+                if (i === j) {
+                    matrix[i][j] = 1.0;
+                } else if (count === 0 || denom1 === 0 || denom2 === 0) {
+                    matrix[i][j] = 0;
+                } else {
+                    matrix[i][j] = numerator / Math.sqrt(denom1 * denom2);
+                }
+            }
+        }
+        
+        return matrix;
     };
 
     const processWindRose = (data: any[], colDirection: string, colSpeed: string, config: WindRoseConfig = {}) => {
@@ -153,8 +219,44 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
             return processWindRose(datosGrafico, ejeX, ejeY);
         }
 
+        if (tipoGrafico === "heatmap") {
+            if (datosGrafico.length === 0) return [];
+            const numericKeys = Object.keys(datosGrafico[0]).filter(key => {
+                const val = datosGrafico[0][key];
+                return val !== null && (!isNaN(parseFloat(val)) && isFinite(val as any));
+            });
+            
+            const matrix = calculateCorrelationMatrix(datosGrafico, numericKeys);
+            return [{
+                x: numericKeys,
+                y: numericKeys,
+                z: matrix,
+                type: 'heatmap',
+                colorscale: 'RdBu',
+                zmin: -1,
+                zmax: 1
+            }];
+        }
+
         const xValues = datosGrafico.map(d => d[ejeX] || d.x);
         const yValues = datosGrafico.map(d => d[ejeY] || d.y);
+
+        const colTemporal = columnasTemporales.length > 0 ? columnasTemporales[0].nombre_columna : null;
+        let customdata: any[] | undefined;
+        let hovertemplate: string | undefined;
+        
+        if (colTemporal && datosGrafico.length > 0 && datosGrafico[0][colTemporal] !== undefined) {
+            customdata = datosGrafico.map(d => d[colTemporal]);
+            hovertemplate = "%{customdata}<br>X: %{x}<br>Y: %{y}<extra></extra>";
+        }
+
+        if (tipoGrafico === "dual_axis") {
+            const yValues2 = datosGrafico.map(d => d[ejeY2]);
+            return [
+                { x: xValues, y: yValues, name: ejeY, type: 'scatter', mode: 'lines', yaxis: 'y1', marker: { color: '#3b82f6' }, line: { color: '#3b82f6' }, customdata, hovertemplate },
+                { x: xValues, y: yValues2, name: ejeY2, type: 'bar', yaxis: 'y2', opacity: 0.6, marker: { color: '#f59e0b' }, customdata, hovertemplate }
+            ];
+        }
 
         if (tipoGrafico === "density") {
             return [{ x: xValues, y: yValues, type: "histogram2dcontour", colorscale: "Viridis" }];
@@ -175,7 +277,14 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
         const plotlyMode = tipoGrafico === "line" ? "lines" :
                            tipoGrafico === "scatter" ? "markers" : undefined;
 
-        return [{ x: xValues, y: yValues, type: plotlyType, mode: plotlyMode, marker: { color: '#3b82f6' }, line: { color: '#3b82f6', width: 2 } }];
+        const traceBase: any = { x: xValues, y: yValues, type: plotlyType, mode: plotlyMode, marker: { color: '#3b82f6' }, line: { color: '#3b82f6', width: 2 } };
+        
+        if (plotlyType === "scatter" && customdata && hovertemplate) {
+            traceBase.customdata = customdata;
+            traceBase.hovertemplate = hovertemplate;
+        }
+
+        return [traceBase];
     };
 
     const generarLayout = () => {
@@ -199,6 +308,25 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
             };
         }
 
+        if (tipoGrafico === "heatmap") {
+            return {
+                ...baseLayout,
+                xaxis: { automargin: true, tickangle: -45 },
+                yaxis: { automargin: true, scaleanchor: 'x', autorange: 'reversed' }
+            };
+        }
+
+        if (tipoGrafico === "dual_axis") {
+            return {
+                ...baseLayout,
+                xaxis: { title: ejeX, automargin: true },
+                yaxis: { title: ejeY, automargin: true, titlefont: { color: '#3b82f6' }, tickfont: { color: '#3b82f6' } },
+                yaxis2: { title: ejeY2, overlaying: 'y', side: 'right', automargin: true, titlefont: { color: '#f59e0b' }, tickfont: { color: '#f59e0b' } },
+                showlegend: true,
+                legend: { orientation: 'h', y: 1.1, x: 0.5, xanchor: 'center' }
+            };
+        }
+
         return {
             ...baseLayout,
             xaxis: { title: ejeX, automargin: true },
@@ -208,7 +336,7 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
 
     return (
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tipo de Gráfico</label>
                     <select
@@ -230,11 +358,13 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
                         <optgroup label="Científicos / Meteorológicos">
                             <option value="windrose">Rosa de los Vientos (Polar)</option>
                             <option value="density">Mapa de Densidad (Concentración)</option>
+                            <option value="heatmap">Mapa de Calor (Correlaciones)</option>
+                            <option value="dual_axis">Gráfico de Doble Eje (Climograma)</option>
                         </optgroup>
                     </select>
                 </div>
 
-                {tipoGrafico && (
+                {tipoGrafico && tipoGrafico !== 'heatmap' && (
                     <div className="animate-in fade-in duration-300">
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                             {tipoGrafico === 'windrose' ? 'Dirección (Ángulo)' : 'Eje X (Dimensión)'}
@@ -258,10 +388,10 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
                     </div>
                 )}
 
-                {tipoGrafico && (
+                {tipoGrafico && tipoGrafico !== 'heatmap' && (
                     <div className="animate-in fade-in duration-300">
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                            {tipoGrafico === 'windrose' ? 'Magnitud (Radio/Velocidad)' : 'Eje Y (Métrica)'}
+                            {tipoGrafico === 'windrose' ? 'Magnitud (Radio/Velocidad)' : 'Eje Y (Métrica principal)'}
                         </label>
                         <select
                             className="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
@@ -308,6 +438,57 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
                         </select>
                     </div>
                 )}
+
+                {tipoGrafico === 'dual_axis' && (
+                    <div className="animate-in fade-in duration-300">
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                            Eje Y Secundario (Métrica)
+                        </label>
+                        <select
+                            className="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
+                            value={ejeY2}
+                            onChange={(e) => setEjeY2(e.target.value)}
+                        >
+                            <option value="">Selecciona columna...</option>
+                            {columnasNumericas.length > 0 ? (
+                                <>
+                                    <optgroup label="Recomendados (Numéricos)">
+                                        {columnasNumericas.map(c => (
+                                            <option
+                                                key={c.nombre_columna}
+                                                value={c.nombre_columna}
+                                                disabled={c.nombre_columna === ejeX || c.nombre_columna === ejeY}
+                                            >
+                                                {c.nombre_columna}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="Otras columnas">
+                                        {campos.filter(c => !columnasNumericas.includes(c)).map(c => (
+                                            <option
+                                                key={c.nombre_columna}
+                                                value={c.nombre_columna}
+                                                disabled={c.nombre_columna === ejeX || c.nombre_columna === ejeY}
+                                            >
+                                                {c.nombre_columna}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                </>
+                            ) : (
+                                campos.map(c => (
+                                    <option
+                                        key={c.nombre_columna}
+                                        value={c.nombre_columna}
+                                        disabled={c.nombre_columna === ejeX || c.nombre_columna === ejeY}
+                                    >
+                                        {c.nombre_columna}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+                )}
             </div>
 
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
@@ -317,7 +498,7 @@ export default function ChartBuilder({ tablaNombre, lakehouseId, campos }: Chart
 
                 <button
                     onClick={handleGenerarGrafico}
-                    disabled={!tipoGrafico || !ejeX || !ejeY || cargandoDatos}
+                    disabled={!tipoGrafico || (tipoGrafico !== 'heatmap' && (!ejeX || !ejeY)) || (tipoGrafico === 'dual_axis' && !ejeY2) || cargandoDatos}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
                 >
                     {cargandoDatos ? (
